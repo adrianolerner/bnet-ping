@@ -1,0 +1,49 @@
+
+/* Public TV Modal */
+.tv-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.tv-modal-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+.tv-modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 90%;
+    width: 400px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    transform: translateY(20px);
+    transition: transform 0.3s ease;
+}
+.tv-modal-overlay.show .tv-modal-content {
+    transform: translateY(0);
+}
+.tv-modal-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    color: var(--text);
+}
+.tv-modal-status {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+.tv-modal-duration {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}

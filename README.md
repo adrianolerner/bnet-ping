@@ -4,6 +4,10 @@ O BNET Ping Monitor é um sistema de monitoramento de disponibilidade (uptime) d
 
 O sistema conta com um painel de administração completo, visualização em tempo real (TV View/Public) ideal para NOCs (Network Operations Centers), e sistema de alerta integrado ao WhatsApp.
 
+<img width="1916" height="943" alt="image" src="https://github.com/user-attachments/assets/05850c04-c695-49e9-951e-f6ab49a31dec" />
+
+<img width="1916" height="944" alt="image" src="https://github.com/user-attachments/assets/3b8ba689-c13d-4a6a-8918-3fb89e5c074d" />
+
 ## Novidades na v0.12
 - **Mapa Geográfico Aprimorado:** Melhorias nas animações e marcações visuais com novos agrupamentos inteligentes (clusters) que não misturam dispositivos de status diferentes (agrupamento distinto para offline e online), com priorização das marcações offline em tela (z-index superior).
 - **Relatórios Multilinguagem Dinâmicos:** A exportação de dados em CSV e PDF agora respeitam o idioma da sessão do usuário, traduzindo automaticamente cabeçalhos e status das tabelas com os novos recursos do `Lang.php`.

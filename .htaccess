@@ -1,0 +1,12 @@
+# Bloqueia o acesso público direto ao arquivo de configuração
+<Files "config.php">
+    Require all denied
+</Files>
+
+# Protege o arquivo readme.md e possíveis outros arquivos sensíveis, de banco de dados ou ocultos
+<FilesMatch "^\.|\.(md|sql|ini|log|sh|db)$">
+    Require all denied
+</FilesMatch>
+
+# Desabilita a listagem de diretórios (Impede que os usuários vejam os arquivos da pasta)
+Options -Indexes

@@ -1,8 +1,31 @@
-# BNET Ping Monitor v0.12
+# BNET Ping Monitor v0.13.6
 
 O BNET Ping Monitor é um sistema de monitoramento de disponibilidade (uptime) desenvolvido em PHP e JavaScript, com suporte nativo à execução assíncrona. Ele acompanha o tempo de resposta, latência, jitter e a porcentagem de perda de pacotes de diversos dispositivos de rede e servidores em tempo real.
 
 O sistema conta com um painel de administração completo, visualização em tempo real (TV View/Public) ideal para NOCs (Network Operations Centers), e sistema de alerta integrado ao WhatsApp.
+
+## Novidades na v0.13
+- **Aba Analítico no Painel Público (`/?page=public`):** Introdução de navegação por abas dinâmicas alternando entre o clássico **Dashboard** (grade de hosts) e a nova visão **Analítico**, com persistência de aba ativa via `localStorage` e hash na URL.
+- **Gráficos Analíticos em Tempo Real (Chart.js):**
+  - **Distribuição de Status (Donut/Pizza):** Proporções e contagens de hosts Online, Offline, Desativados e Desconhecidos.
+  - **Top 10 Hosts com Mais Quedas (Barras):** Foco nos últimos 7 dias com renderização integral dos 10 nomes de hosts sem omissão de rótulos (`autoSkip: false`).
+  - **Histórico Consolidado de 7 Dias (Linhas):** Linha verde exibindo o total de hosts operacionais e linha vermelha exibindo a quantidade de hosts com interrupções/quedas no período e no momento exato da visualização.
+- **Tabela Dinâmica de Eventos de Queda:**
+  - Listagem dos eventos offline detectados em tempo real, com ordenação dos mais recentes no topo.
+  - Cronômetro ativo (*live ticker*) calculando a duração da interrupção segundo a segundo.
+  - Filtros rápidos por pílula para alternar entre "Offline no Momento" e "Histórico de Quedas".
+  - Busca instantânea por nome do host e botão de acesso direto ao modal de detalhes.
+- **Design Otimizado para Telões NOC (Zero Scrollbar):**
+  - Encaixe ergonômico 100% responsivo ocupando rigorosamente a altura da janela (*viewport*), eliminando barras de rolagem globais indesejadas.
+  - Relógio e data em tempo real centralizados horizontalmente no cabeçalho com formatação tabular e destaque luminoso.
+  - Rolagem interna suave e exclusiva na tabela de eventos para grandes volumes de dados.
+- **Otimização de Alto Desempenho, Concorrência e Auto-Indexação (v0.13.6):**
+  - **Zero Bloqueios de Sessão:** Rotas públicas não inicializam sessão PHP, permitindo concorrência livre e resposta instantânea em F5 ou requisições paralelas.
+  - **Eliminação de Bloqueio de Metadados (*Metadata Locks*):** Cache de versão do esquema (`schema_version`) no boot, eliminando a execução redundante de comandos DDL (`CREATE TABLE`, `ALTER TABLE`) a cada requisição web.
+  - **Consultas Sub-Milissegundo:** Consultas analíticas diretas e indexadas em `host_downtimes` (`idx_hd_host_start`, `idx_hd_start_time`, `idx_hd_end_time`), sem subqueries temporárias ou tabelas derivadas.
+  - **Índice Composto em Telemetria (`idx_pr_host_time`):** Índice em `(host_id, timestamp)` em `ping_results`, acelerando a abertura e renderização dos gráficos de métricas de hosts em bases com milhões de registros.
+  - **Controle de Concorrência Frontend:** Travas assíncronas (`isFetching` guards) com inicialização segura sem Temporal Dead Zone.
+- **Nova Rota de API Pública (`api/analytics-public`):** Agrega métricas consolidadas com consultas SQL seguras e otimizadas em tempo de execução (`PingData::getAnalyticsData()`), sem expor dados sensíveis de infraestrutura.
 
 ## Novidades na v0.12
 - **Mapa Geográfico Aprimorado:** Melhorias nas animações e marcações visuais com novos agrupamentos inteligentes (clusters) que não misturam dispositivos de status diferentes (agrupamento distinto para offline e online), com priorização das marcações offline em tela (z-index superior).

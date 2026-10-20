@@ -46,6 +46,17 @@ class Database {
     private static function initSchema() {
         $db = self::$pdo;
         
+        $targetVersion = '0.13.6';
+        try {
+            $stmt = $db->query("SELECT `value` FROM settings WHERE `key` = 'schema_version'");
+            $installedVersion = $stmt->fetchColumn();
+            if ($installedVersion === $targetVersion) {
+                return; // Schema já está atualizado! Evita DDL e bloqueios de metadata lock no MariaDB
+            }
+        } catch (\PDOException $e) {
+            // Tabela settings ainda não existe, prossegue com a migração inicial
+        }
+        
         $db->exec("CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
             username VARCHAR(255) UNIQUE NOT NULL,
@@ -132,6 +143,41 @@ class Database {
             FOREIGN KEY(host_id) REFERENCES hosts(id) ON DELETE CASCADE
         )");
 
+        // Auto-migração: Índices de alto desempenho para consultas analíticas e relatórios de downtime
+        try {
+            $db->exec("ALTER TABLE host_downtimes ADD INDEX idx_hd_host_start (host_id, start_time)");
+        } catch (\PDOException $e) {
+            // Índice já existe
+        }
+        try {
+            $db->exec("ALTER TABLE host_downtimes ADD INDEX idx_hd_start_time (start_time)");
+        } catch (\PDOException $e) {
+            // Índice já existe
+        }
+        try {
+            $db->exec("ALTER TABLE host_downtimes ADD INDEX idx_hd_end_time (end_time)");
+        } catch (\PDOException $e) {
+            // Índice já existe
+        }
+        try {
+            $db->exec("ALTER TABLE archived_host_downtimes ADD INDEX idx_ahd_host_start (host_id, start_time)");
+        } catch (\PDOException $e) {
+            // Índice já existe
+        }
+        try {
+            $db->exec("ALTER TABLE archived_host_downtimes ADD INDEX idx_ahd_start_time (start_time)");
+        } catch (\PDOException $e) {
+            // Índice já existe
+        }
+        try {
+            $stmt = $db->query("SHOW INDEX FROM ping_results WHERE Key_name = 'idx_pr_host_time'");
+            if ($stmt->rowCount() == 0) {
+                $db->exec("ALTER TABLE ping_results ADD INDEX idx_pr_host_time (host_id, timestamp)");
+            }
+        } catch (\PDOException $e) {
+            // Índice já existe
+        }
+
         $db->exec("CREATE TABLE IF NOT EXISTS rate_limits (
             ip VARCHAR(45) PRIMARY KEY,
             attempts INT DEFAULT 0,
@@ -143,6 +189,14 @@ class Database {
         if ($stmt->fetchColumn() == 0) {
             $hash = password_hash('admin', PASSWORD_DEFAULT);
             $db->exec("INSERT INTO users (username, password) VALUES ('admin', '$hash')");
+        }
+
+        // Registra versão do schema para dispensar DDL em requisições futuras
+        try {
+            $stmt = $db->prepare("REPLACE INTO settings (`key`, `value`) VALUES ('schema_version', ?)");
+            $stmt->execute([$targetVersion]);
+        } catch (\Exception $e) {
+            // Ignore
         }
 
         // Insert default settings

@@ -1,34 +1,14 @@
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     Chart.defaults.color = '#94a3b8';
     Chart.defaults.borderColor = '#2e344e';
 
-    const fetchMetrics = async () => {
-        try {
-            const res = await fetch(`?page=api/metrics&id=${hostId}&period=${period}`);
-            return await res.json();
-        } catch (e) {
-            console.error('Error fetching metrics', e);
-            return [];
-        }
-    };
-
-    const data = await fetchMetrics();
-    
-    if (!data || data.length === 0) {
-        document.querySelector('.charts-container').innerHTML = `<div class="empty-state text-muted">${window.i18n.no_data}</div>`;
-        return;
-    }
-
-    const labels = data.map(d => {
-        const date = new Date(d.timestamp.replace(' ', 'T'));
-        return date.toLocaleString();
-    });
-
     const createChart = (ctxId, label, datasets, yAxisTitle) => {
-        const ctx = document.getElementById(ctxId).getContext('2d');
+        const el = document.getElementById(ctxId);
+        if (!el) return null;
+        const ctx = el.getContext('2d');
         return new Chart(ctx, {
             type: 'line',
-            data: { labels, datasets },
+            data: { labels: chartLabels, datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -48,39 +28,68 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
-    createChart('latencyChart', window.i18n.js_latency_ms || 'Latency (ms)', [
-        { label: 'Avg', data: data.map(d => d.avg_ms), borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', fill: true, tension: 0.4 },
-        { label: 'Max', data: data.map(d => d.max_ms), borderColor: '#ef4444', borderDash: [5, 5], tension: 0.4, hidden: true },
-        { label: 'Min', data: data.map(d => d.min_ms), borderColor: '#10b981', borderDash: [5, 5], tension: 0.4, hidden: true }
-    ], 'ms');
+    let chartLabels = [];
 
-    createChart('packetLossChart', window.i18n.js_packet_loss || 'Packet Loss (%)', [
-        { label: 'Loss %', data: data.map(d => d.packet_loss), borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.4 }
-    ], '%');
+    const loadMetrics = async () => {
+        try {
+            const res = await fetch(`?page=api/metrics&id=${hostId}&period=${period}`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            
+            const container = document.querySelector('.charts-container');
+            if (!data || data.length === 0) {
+                if (container) {
+                    container.innerHTML = `<div class="empty-state text-muted" style="width: 100%; text-align: center; padding: 2rem;">${window.i18n.no_data || 'Nenhum dado encontrado'}</div>`;
+                }
+                return;
+            }
 
-    createChart('jitterChart', window.i18n.js_jitter_ms || 'Jitter (ms)', [
-        { label: 'Jitter', data: data.map(d => d.jitter), borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.4 }
-    ], 'ms');
+            chartLabels = data.map(d => {
+                const date = new Date(d.timestamp.replace(' ', 'T'));
+                return date.toLocaleString();
+            });
 
+            createChart('latencyChart', window.i18n.js_latency_ms || 'Latency (ms)', [
+                { label: 'Avg', data: data.map(d => d.avg_ms), borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', fill: true, tension: 0.4 },
+                { label: 'Max', data: data.map(d => d.max_ms), borderColor: '#ef4444', borderDash: [5, 5], tension: 0.4, hidden: true },
+                { label: 'Min', data: data.map(d => d.min_ms), borderColor: '#10b981', borderDash: [5, 5], tension: 0.4, hidden: true }
+            ], 'ms');
+
+            createChart('packetLossChart', window.i18n.js_packet_loss || 'Packet Loss (%)', [
+                { label: 'Loss %', data: data.map(d => d.packet_loss), borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.4 }
+            ], '%');
+
+            createChart('jitterChart', window.i18n.js_jitter_ms || 'Jitter (ms)', [
+                { label: 'Jitter', data: data.map(d => d.jitter), borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.4 }
+            ], 'ms');
+        } catch (e) {
+            console.error('Error fetching metrics', e);
+            const container = document.querySelector('.charts-container');
+            if (container) {
+                container.innerHTML = `<div class="empty-state text-muted" style="width: 100%; text-align: center; padding: 2rem;">${window.i18n.no_data || 'Nenhum dado encontrado'}</div>`;
+            }
+        }
+    };
+
+    // --- History Table Logic (runs in parallel, never blocked by metrics) ---
     let isArchivedView = false;
+    let historyData = [];
+    let currentFilteredData = [];
+    let currentSort = { column: 'date', order: 'desc' };
+    let currentPage = 1;
+    const itemsPerPage = 20;
 
-    // Fetch and render downtime history
     const fetchHistory = async () => {
         try {
             const endpoint = isArchivedView ? `?page=api/history-archived&id=${hostId}` : `?page=api/history&id=${hostId}`;
             const res = await fetch(endpoint);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             return await res.json();
         } catch (e) {
             console.error('Error fetching history', e);
             return [];
         }
     };
-
-    let historyData = [];
-    let currentFilteredData = [];
-    let currentSort = { column: 'date', order: 'desc' };
-    let currentPage = 1;
-    const itemsPerPage = 20;
 
     function formatDuration(ms) {
         if (ms < 0) return '0s';
@@ -101,10 +110,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const renderTable = (data) => {
         const tbody = document.querySelector('#hostHistoryTable tbody');
         const pagination = document.getElementById('hostHistoryPagination');
+        if (!tbody) return;
         
-        if (data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" class="text-muted text-center">${window.i18n.no_data}</td></tr>`;
-            if(pagination) pagination.innerHTML = '';
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-muted text-center">${window.i18n.no_data || 'Nenhum dado encontrado'}</td></tr>`;
+            if (pagination) pagination.innerHTML = '';
             return;
         }
 
@@ -128,7 +138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 durationStr = formatDuration(endDate - startDate);
             } else {
                 durationStr = formatDuration(new Date() - startDate);
-                endStr = `<span class="status-badge status-offline">${window.i18n.now}</span>`;
+                endStr = `<span class="status-badge status-offline">${window.i18n.now || 'AGORA'}</span>`;
             }
             
             const tr = document.createElement('tr');
@@ -182,8 +192,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderTable(currentFilteredData);
     };
 
-    historyData = await fetchHistory();
-    filterAndRender();
+    const loadHistory = async () => {
+        historyData = await fetchHistory();
+        filterAndRender();
+    };
 
     const searchInput = document.getElementById('hostHistorySearch');
     if (searchInput) {
@@ -202,8 +214,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 toggleBtn.textContent = window.i18n.btn_old_downtimes || 'Old Downtimes (> 30 days)';
                 title.textContent = window.i18n.host_history_title || 'Downtime History';
             }
-            historyData = await fetchHistory();
-            filterAndRender();
+            const tbody = document.querySelector('#hostHistoryTable tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="3" class="text-muted text-center">${window.i18n.loading || 'Carregando...'}</td></tr>`;
+            await loadHistory();
         });
     }
 
@@ -214,4 +227,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             filterAndRender();
         });
     });
+
+    // Run both in parallel
+    loadMetrics();
+    loadHistory();
 });

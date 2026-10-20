@@ -3,13 +3,12 @@
  * INSTRUÇÃO: Sempre atualize a constante APP_VERSION (versões e subversões) 
  * sempre que realizar alterações futuras no código do sistema!
  */
-define('APP_VERSION', '0.12.1');
+define('APP_VERSION', '0.13.6');
 
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Settings.php';
 require_once __DIR__ . '/../src/Host.php';
-require_once __DIR__ . '/../src/PingData.php';
 require_once __DIR__ . '/../src/PingData.php';
 require_once __DIR__ . '/../src/Lang.php';
 
@@ -19,9 +18,17 @@ use PingApp\Host;
 use PingApp\PingData;
 use PingApp\Lang;
 
-Auth::startSession();
-
 $page = $_GET['page'] ?? 'dashboard';
+
+// Apenas inicia sessão PHP para rotas administrativas/autenticadas.
+// Rotas públicas (public, api/hosts-public, api/analytics-public) NUNCA iniciam sessão,
+// eliminando completamente qualquer bloqueio de arquivo de sessão (flock) e permitindo
+// paralelismo instantâneo entre abas, requisições paralelas e recarregamentos (F5)
+$isPublicRoute = ($page === 'public' || $page === 'api/hosts-public' || $page === 'api/analytics-public');
+
+if (!$isPublicRoute) {
+    Auth::startSession();
+}
 
 if ($page === 'set_lang') {
     $lang = $_GET['lang'] ?? 'en';
@@ -254,195 +261,196 @@ if ($page === 'export_pdf') {
 
     // Render clean HTML
     ?>
-    <!DOCTYPE html>
-    <html>
+        <!DOCTYPE html>
+        <html>
 
-    <head>
-        <title>Report</title>
-        <style>
-            body {
-                font-family: 'Helvetica', 'Arial', sans-serif;
-                font-size: 12px;
-                color: #333;
-            }
-
-            h1,
-            h2,
-            h3 {
-                color: #1a202c;
-            }
-
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 15px;
-            }
-
-            th,
-            td {
-                padding: 8px;
-                border: 1px solid #e2e8f0;
-                text-align: left;
-            }
-
-            th {
-                background-color: #f8fafc;
-                font-weight: bold;
-            }
-
-            .header {
-                border-bottom: 2px solid #e2e8f0;
-                padding-bottom: 10px;
-                margin-bottom: 20px;
-            }
-
-            .chart-container {
-                width: 100%;
-                height: 250px;
-                margin-bottom: 20px;
-            }
-
-            @media print {
-                @page {
-                    size: landscape;
-                    margin: 10mm;
-                }
-
+        <head>
+            <title>Report</title>
+            <style>
                 body {
-                    -webkit-print-color-adjust: exact;
+                    font-family: 'Helvetica', 'Arial', sans-serif;
+                    font-size: 12px;
+                    color: #333;
                 }
-            }
-        </style>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    </head>
 
-    <body>
-        <div id="pdf-content" style="padding: 20px;">
-            <div class="header">
-                <h1><?= \PingApp\Lang::get('pdf_report_title') ?></h1>
-                <p><strong><?= \PingApp\Lang::get('pdf_type') ?>:</strong>
-                    <?= $type === 'downtime' ? \PingApp\Lang::get('pdf_type_downtime') : \PingApp\Lang::get('pdf_type_stats') ?>
-                </p>
-                <p><strong><?= \PingApp\Lang::get('pdf_host') ?>:</strong> <?= htmlspecialchars($hostName) ?></p>
-                <p><strong><?= \PingApp\Lang::get('pdf_date_range') ?>:</strong>
-                    <?= htmlspecialchars($_GET['start_date'] ?? \PingApp\Lang::get('pdf_any')) ?> to
-                    <?= htmlspecialchars($_GET['end_date'] ?? \PingApp\Lang::get('pdf_any')) ?>
-                </p>
-                <p><strong><?= \PingApp\Lang::get('pdf_generated_on') ?>:</strong> <?= date('Y-m-d H:i:s') ?></p>
+                h1,
+                h2,
+                h3 {
+                    color: #1a202c;
+                }
+
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 15px;
+                }
+
+                th,
+                td {
+                    padding: 8px;
+                    border: 1px solid #e2e8f0;
+                    text-align: left;
+                }
+
+                th {
+                    background-color: #f8fafc;
+                    font-weight: bold;
+                }
+
+                .header {
+                    border-bottom: 2px solid #e2e8f0;
+                    padding-bottom: 10px;
+                    margin-bottom: 20px;
+                }
+
+                .chart-container {
+                    width: 100%;
+                    height: 250px;
+                    margin-bottom: 20px;
+                }
+
+                @media print {
+                    @page {
+                        size: landscape;
+                        margin: 10mm;
+                    }
+
+                    body {
+                        -webkit-print-color-adjust: exact;
+                    }
+                }
+            </style>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        </head>
+
+        <body>
+            <div id="pdf-content" style="padding: 20px;">
+                <div class="header">
+                    <h1><?= \PingApp\Lang::get('pdf_report_title') ?></h1>
+                    <p><strong><?= \PingApp\Lang::get('pdf_type') ?>:</strong>
+                        <?= $type === 'downtime' ? \PingApp\Lang::get('pdf_type_downtime') : \PingApp\Lang::get('pdf_type_stats') ?>
+                    </p>
+                    <p><strong><?= \PingApp\Lang::get('pdf_host') ?>:</strong> <?= htmlspecialchars($hostName) ?></p>
+                    <p><strong><?= \PingApp\Lang::get('pdf_date_range') ?>:</strong>
+                        <?= htmlspecialchars($_GET['start_date'] ?? \PingApp\Lang::get('pdf_any')) ?> to
+                        <?= htmlspecialchars($_GET['end_date'] ?? \PingApp\Lang::get('pdf_any')) ?>
+                    </p>
+                    <p><strong><?= \PingApp\Lang::get('pdf_generated_on') ?>:</strong> <?= date('Y-m-d H:i:s') ?></p>
+                </div>
+
+                <table>
+                    <?php if ($type === 'downtime'): ?>
+                            <thead>
+                                <tr>
+                                    <th><?= \PingApp\Lang::get('pdf_host') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_ip') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_went_offline') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_came_online') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_duration') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($data as $row):
+                                    $start = strtotime($row['start_time']);
+                                    $end = $row['end_time'] ? strtotime($row['end_time']) : time();
+                                    $dur = $end - $start;
+                                    $durStr = floor($dur / 3600) . 'h ' . floor(($dur % 3600) / 60) . 'm ' . ($dur % 60) . 's';
+                                    ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($row['name']) ?></td>
+                                            <td><?= htmlspecialchars($row['ip']) ?></td>
+                                            <td><?= $row['start_time'] ?></td>
+                                            <td><?= $row['end_time'] ?? \PingApp\Lang::get('csv_ongoing') ?></td>
+                                            <td><?= $durStr ?></td>
+                                        </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($data)): ?>
+                                        <tr>
+                                            <td colspan="5"><?= \PingApp\Lang::get('no_data') ?></td>
+                                        </tr><?php endif; ?>
+                            </tbody>
+                    <?php else: ?>
+                            <?php if (!empty($data)): ?>
+                                    <div class="chart-container">
+                                        <canvas id="statsChart"></canvas>
+                                    </div>
+                            <?php endif; ?>
+                            <thead>
+                                <tr>
+                                    <th><?= \PingApp\Lang::get('pdf_host') ?></th>
+                                    <th><?= \PingApp\Lang::get('pdf_time') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_status') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_avg_latency') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_packet_loss') ?></th>
+                                    <th><?= \PingApp\Lang::get('csv_jitter') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($data as $row): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($row['name']) ?></td>
+                                            <td><?= $row['timestamp'] ?></td>
+                                            <td><?= $row['status'] ?></td>
+                                            <td><?= $row['avg_ms'] ?>ms</td>
+                                            <td><?= $row['packet_loss'] ?>%</td>
+                                            <td><?= $row['jitter'] ?>ms</td>
+                                        </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($data)): ?>
+                                        <tr>
+                                            <td colspan="6"><?= \PingApp\Lang::get('no_data') ?></td>
+                                        </tr><?php endif; ?>
+                            </tbody>
+                    <?php endif; ?>
+                </table>
             </div>
 
-            <table>
-                <?php if ($type === 'downtime'): ?>
-                    <thead>
-                        <tr>
-                            <th><?= \PingApp\Lang::get('pdf_host') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_ip') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_went_offline') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_came_online') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_duration') ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($data as $row):
-                            $start = strtotime($row['start_time']);
-                            $end = $row['end_time'] ? strtotime($row['end_time']) : time();
-                            $dur = $end - $start;
-                            $durStr = floor($dur / 3600) . 'h ' . floor(($dur % 3600) / 60) . 'm ' . ($dur % 60) . 's';
-                            ?>
-                            <tr>
-                                <td><?= htmlspecialchars($row['name']) ?></td>
-                                <td><?= htmlspecialchars($row['ip']) ?></td>
-                                <td><?= $row['start_time'] ?></td>
-                                <td><?= $row['end_time'] ?? \PingApp\Lang::get('csv_ongoing') ?></td>
-                                <td><?= $durStr ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <?php if (empty($data)): ?>
-                            <tr>
-                                <td colspan="5"><?= \PingApp\Lang::get('no_data') ?></td>
-                            </tr><?php endif; ?>
-                    </tbody>
-                <?php else: ?>
-                    <?php if (!empty($data)): ?>
-                        <div class="chart-container">
-                            <canvas id="statsChart"></canvas>
-                        </div>
+            <script>
+                document.addEventListener("DOMContentLoaded", () => {
+                    <?php if ($type === 'stats' && !empty($data)): ?>
+                            const rawData = <?= json_encode($data) ?>;
+                            const labels = rawData.map(d => d.timestamp).reverse();
+                            const avgData = rawData.map(d => d.avg_ms).reverse();
+                            const lossData = rawData.map(d => d.packet_loss).reverse();
+
+                            const ctx = document.getElementById('statsChart').getContext('2d');
+                            new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: labels,
+                                    datasets: [
+                                        { label: 'Avg Latency (ms)', data: avgData, borderColor: '#3b82f6', tension: 0.1, yAxisID: 'y' },
+                                        { label: 'Packet Loss (%)', data: lossData, borderColor: '#ef4444', tension: 0.1, yAxisID: 'y1' }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    animation: false,
+                                    scales: {
+                                        y: { type: 'linear', display: true, position: 'left' },
+                                        y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false } }
+                                    }
+                                }
+                            });
                     <?php endif; ?>
-                    <thead>
-                        <tr>
-                            <th><?= \PingApp\Lang::get('pdf_host') ?></th>
-                            <th><?= \PingApp\Lang::get('pdf_time') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_status') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_avg_latency') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_packet_loss') ?></th>
-                            <th><?= \PingApp\Lang::get('csv_jitter') ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($data as $row): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($row['name']) ?></td>
-                                <td><?= $row['timestamp'] ?></td>
-                                <td><?= $row['status'] ?></td>
-                                <td><?= $row['avg_ms'] ?>ms</td>
-                                <td><?= $row['packet_loss'] ?>%</td>
-                                <td><?= $row['jitter'] ?>ms</td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <?php if (empty($data)): ?>
-                            <tr>
-                                <td colspan="6"><?= \PingApp\Lang::get('no_data') ?></td>
-                            </tr><?php endif; ?>
-                    </tbody>
-                <?php endif; ?>
-            </table>
-        </div>
 
-        <script>
-            document.addEventListener("DOMContentLoaded", () => {
-                <?php if ($type === 'stats' && !empty($data)): ?>
-                    const rawData = <?= json_encode($data) ?>;
-                    const labels = rawData.map(d => d.timestamp).reverse();
-                    const avgData = rawData.map(d => d.avg_ms).reverse();
-                    const lossData = rawData.map(d => d.packet_loss).reverse();
+                    setTimeout(() => {
+                        window.print();
+                    }, 500); // Wait for chart to render just in case
+                });
+            </script>
+        </body>
 
-                    const ctx = document.getElementById('statsChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [
-                                { label: 'Avg Latency (ms)', data: avgData, borderColor: '#3b82f6', tension: 0.1, yAxisID: 'y' },
-                                { label: 'Packet Loss (%)', data: lossData, borderColor: '#ef4444', tension: 0.1, yAxisID: 'y1' }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            animation: false,
-                            scales: {
-                                y: { type: 'linear', display: true, position: 'left' },
-                                y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false } }
-                            }
-                        }
-                    });
-                <?php endif; ?>
-
-                setTimeout(() => {
-                    window.print();
-                }, 500); // Wait for chart to render just in case
-            });
-        </script>
-    </body>
-
-    </html>
-    <?php
-    exit;
+        </html>
+        <?php
+        exit;
 }
 
 if (strpos($page, 'api/') === 0) {
     header('Content-Type: application/json');
     if ($page === 'api/hosts-public') {
+        session_write_close();
         $hosts = Host::getAll();
         // Remove IP for public dashboard
         foreach ($hosts as &$h) {
@@ -452,7 +460,17 @@ if (strpos($page, 'api/') === 0) {
         exit;
     }
 
+    if ($page === 'api/analytics-public') {
+        session_write_close();
+        echo json_encode(PingData::getAnalyticsData());
+        exit;
+    }
+
     Auth::requireLogin();
+    // Libera a trava de sessão imediatamente após verificar autenticação
+    // para permitir requisições de métricas simultâneas sem bloqueio mútuo
+    session_write_close();
+
     if ($page === 'api/map-config') {
         $config = require __DIR__ . '/../config.php';
         echo json_encode(['carto_api_key' => $config['carto_api_key'] ?? '']);
@@ -736,7 +754,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BNET Ping Monitor</title>
-    <link rel="stylesheet" href="css/style.css?v=1.6">
+    <link rel="stylesheet" href="css/style.css?v=<?= APP_VERSION ?>">
+    <link rel="stylesheet" href="css/analytics.css?v=<?= APP_VERSION ?>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <?php
@@ -754,781 +773,919 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
     </script>
 </head>
 
-<body>
+<body class="<?= $page === 'public' ? 'public-body' : '' ?>">
     <?php if ($page !== 'login' && $page !== 'public'): ?>
-        <nav class="navbar">
-            <div class="nav-brand">
-                <img src="img/logo.png" alt="<?= Lang::get('bnet_monitor') ?>"
-                    style="height: 35px; width: auto; max-width: 200px; object-fit: contain;"
-                    onerror="this.outerHTML='<?= Lang::get('bnet_monitor') ?>'">
-            </div>
-            <div class="nav-links">
-                <a href="?page=dashboard"
-                    class="<?= $page === 'dashboard' ? 'active' : '' ?>"><?= Lang::get('nav_dashboard') ?></a>
-                <a href="?page=map" class="<?= $page === 'map' ? 'active' : '' ?>"><?= Lang::get('nav_map') ?></a>
-                <a href="?page=history"
-                    class="<?= $page === 'history' ? 'active' : '' ?>"><?= Lang::get('nav_history') ?></a>
-                <a href="?page=reports"
-                    class="<?= $page === 'reports' ? 'active' : '' ?>"><?= Lang::get('nav_reports') ?></a>
-                <a href="?page=settings"
-                    class="<?= $page === 'settings' ? 'active' : '' ?>"><?= Lang::get('nav_settings') ?></a>
-                <div
-                    style="display:inline-block; margin-left:1rem; border-left:1px solid var(--border); padding-left:1rem;">
-                    <a href="?page=set_lang&lang=en"
-                        style="padding:0.2rem 0.5rem; color:<?= Lang::getLanguage() === 'en' ? 'var(--accent)' : 'var(--text)' ?>;">EN</a>
-                    |
-                    <a href="?page=set_lang&lang=pt"
-                        style="padding:0.2rem 0.5rem; color:<?= Lang::getLanguage() === 'pt' ? 'var(--accent)' : 'var(--text)' ?>;">PT</a>
+            <nav class="navbar">
+                <div class="nav-brand">
+                    <img src="img/logo.png" alt="<?= Lang::get('bnet_monitor') ?>"
+                        style="height: 35px; width: auto; max-width: 200px; object-fit: contain;"
+                        onerror="this.outerHTML='<?= Lang::get('bnet_monitor') ?>'">
                 </div>
-                <a href="?page=logout" class="logout-btn"><?= Lang::get('nav_logout') ?></a>
-            </div>
-        </nav>
+                <div class="nav-links">
+                    <a href="?page=dashboard"
+                        class="<?= $page === 'dashboard' ? 'active' : '' ?>"><?= Lang::get('nav_dashboard') ?></a>
+                    <a href="?page=map" class="<?= $page === 'map' ? 'active' : '' ?>"><?= Lang::get('nav_map') ?></a>
+                    <a href="?page=history"
+                        class="<?= $page === 'history' ? 'active' : '' ?>"><?= Lang::get('nav_history') ?></a>
+                    <a href="?page=reports"
+                        class="<?= $page === 'reports' ? 'active' : '' ?>"><?= Lang::get('nav_reports') ?></a>
+                    <a href="?page=settings"
+                        class="<?= $page === 'settings' ? 'active' : '' ?>"><?= Lang::get('nav_settings') ?></a>
+                    <div
+                        style="display:inline-block; margin-left:1rem; border-left:1px solid var(--border); padding-left:1rem;">
+                        <a href="?page=set_lang&lang=en"
+                            style="padding:0.2rem 0.5rem; color:<?= Lang::getLanguage() === 'en' ? 'var(--accent)' : 'var(--text)' ?>;">EN</a>
+                        |
+                        <a href="?page=set_lang&lang=pt"
+                            style="padding:0.2rem 0.5rem; color:<?= Lang::getLanguage() === 'pt' ? 'var(--accent)' : 'var(--text)' ?>;">PT</a>
+                    </div>
+                    <a href="?page=logout" class="logout-btn"><?= Lang::get('nav_logout') ?></a>
+                </div>
+            </nav>
     <?php endif; ?>
 
     <main class="<?= $page === 'public' ? 'public-container' : 'container' ?>">
         <?php if ($page === 'login'): ?>
-            <div class="login-container">
-                <div class="login-box">
-                    <div style="text-align: center; margin-bottom: 1.5rem;">
-                        <img src="img/logo.png" alt="Logo"
-                            style="height: 80px; width: auto; max-width: 100%; object-fit: contain;"
-                            onerror="this.style.display='none'">
-                    </div>
-                    <h2 style="text-align: center; margin-top: 0;"><?= Lang::get('login_welcome') ?></h2>
-                    <?php if (isset($loginError)): ?>
-                        <div class="alert alert-error"><?= htmlspecialchars($loginError) ?></div>
-                    <?php endif; ?>
-                    <form method="POST" action="?page=login">
-                        <div class="form-group">
-                            <label><?= Lang::get('login_username') ?></label>
-                            <input type="text" name="username" required>
+                <div class="login-container">
+                    <div class="login-box">
+                        <div style="text-align: center; margin-bottom: 1.5rem;">
+                            <img src="img/logo.png" alt="Logo"
+                                style="height: 80px; width: auto; max-width: 100%; object-fit: contain;"
+                                onerror="this.style.display='none'">
                         </div>
-                        <div class="form-group">
-                            <label><?= Lang::get('login_password') ?></label>
-                            <input type="password" name="password" required>
-                        </div>
-                        <?php if (isset($settings['turnstile_enabled']) && $settings['turnstile_enabled'] == '1'): ?>
-                            <div class="cf-turnstile" data-sitekey="<?= htmlspecialchars($settings['turnstile_site_key']) ?>">
-                            </div>
+                        <h2 style="text-align: center; margin-top: 0;"><?= Lang::get('login_welcome') ?></h2>
+                        <?php if (isset($loginError)): ?>
+                                <div class="alert alert-error"><?= htmlspecialchars($loginError) ?></div>
                         <?php endif; ?>
-                        <button type="submit" class="btn btn-primary btn-block"><?= Lang::get('login_btn') ?></button>
-                    </form>
-                </div>
-            </div>
-        <?php elseif ($page === 'dashboard'): ?>
-            <div class="dashboard-header">
-                <h2><?= Lang::get('dash_overview') ?></h2>
-                <div class="dashboard-controls" style="display: flex; gap: 1rem;">
-                    <select id="sortSelect" class="form-select">
-                        <option value="name"><?= Lang::get('sort_name') ?></option>
-                        <option value="ip"><?= Lang::get('sort_ip') ?></option>
-                        <option value="status"><?= Lang::get('sort_offline_first') ?></option>
-                    </select>
-                    <input type="text" id="searchInput" placeholder="<?= Lang::get('search_placeholder') ?>"
-                        class="search-input">
-                    <a href="?page=public" class="btn btn-primary" target="_blank" title="<?= Lang::get('tv_view') ?>"
-                        style="white-space: nowrap;"><?= Lang::get('tv_view') ?></a>
-                </div>
-            </div>
-            <div class="hosts-grid" id="hostsGrid">
-                <!-- Populated by JS -->
-            </div>
-        <?php elseif ($page === 'public'): ?>
-            <div class="public-header"
-                style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem; padding: 0.5rem 1rem; background: var(--bg-card); border-bottom: 1px solid var(--border);">
-                <div class="nav-brand" style="margin: 0; padding: 0;">
-                    <img src="img/logo.png" alt="<?= Lang::get('bnet_monitor_public') ?>"
-                        style="height: 30px; width: auto; max-width: 150px; object-fit: contain;"
-                        onerror="this.outerHTML='<h1 style=\'margin: 0; font-size: 1.1rem;\'><?= Lang::get('bnet_monitor_public') ?></h1>'">
-                </div>
-                <div style="display:flex; gap: 0.5rem; align-items:center; flex-wrap: wrap; justify-content: flex-end;">
-                    <select id="sortSelect" class="form-select"
-                        style="width: auto; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.8rem; background: var(--bg-input); color: white; border: 1px solid var(--border);">
-                        <option value="status"><?= Lang::get('sort_offline_first') ?></option>
-                        <option value="name"><?= Lang::get('sort_name') ?></option>
-                    </select>
-                    <button id="tvModeBtn" class="btn btn-secondary btn-sm"
-                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; white-space: nowrap;"><?= Lang::get('tv_view') ?>:
-                        ON</button>
-                    <button id="enableAudioBtn" class="btn btn-primary btn-sm"
-                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; white-space: nowrap;"><?= Lang::get('enable_audio') ?></button>
-                    <div id="hostSummary"
-                        style="font-size: 0.8rem; font-weight: bold; display: flex; gap: 0.5rem; white-space: nowrap;">
+                        <form method="POST" action="?page=login">
+                            <div class="form-group">
+                                <label><?= Lang::get('login_username') ?></label>
+                                <input type="text" name="username" required>
+                            </div>
+                            <div class="form-group">
+                                <label><?= Lang::get('login_password') ?></label>
+                                <input type="password" name="password" required>
+                            </div>
+                            <?php if (isset($settings['turnstile_enabled']) && $settings['turnstile_enabled'] == '1'): ?>
+                                    <div class="cf-turnstile" data-sitekey="<?= htmlspecialchars($settings['turnstile_site_key']) ?>">
+                                    </div>
+                            <?php endif; ?>
+                            <button type="submit" class="btn btn-primary btn-block"><?= Lang::get('login_btn') ?></button>
+                        </form>
                     </div>
-                    <span id="clock"
-                        style="font-size: 1rem; font-weight: bold; white-space: nowrap; color: #38bdf8;">--:--:--</span>
                 </div>
-            </div>
-            <div class="public-grid" id="publicGrid"
-                style="display: grid; height: calc(100vh - 45px); gap: 0.4rem; padding: 0 0.5rem 0.5rem 0.5rem; overflow: hidden;">
-                <!-- Populated by JS -->
-            </div>
-            <script src="js/public.js?v=1.7"></script>
+        <?php elseif ($page === 'dashboard'): ?>
+                <div class="dashboard-header">
+                    <h2><?= Lang::get('dash_overview') ?></h2>
+                    <div class="dashboard-controls" style="display: flex; gap: 1rem;">
+                        <select id="sortSelect" class="form-select">
+                            <option value="name"><?= Lang::get('sort_name') ?></option>
+                            <option value="ip"><?= Lang::get('sort_ip') ?></option>
+                            <option value="status"><?= Lang::get('sort_offline_first') ?></option>
+                        </select>
+                        <input type="text" id="searchInput" placeholder="<?= Lang::get('search_placeholder') ?>"
+                            class="search-input">
+                        <a href="?page=public" class="btn btn-primary" target="_blank" title="<?= Lang::get('tv_view') ?>"
+                            style="white-space: nowrap;"><?= Lang::get('tv_view') ?></a>
+                    </div>
+                </div>
+                <div class="hosts-grid" id="hostsGrid">
+                    <!-- Populated by JS -->
+                </div>
+        <?php elseif ($page === 'public'): ?>
+                <div class="public-header"
+                    style="display:flex; justify-content:space-between; align-items:center; padding: 0.35rem 0.85rem; background: var(--bg-card); border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem; flex-shrink: 0; position: relative;">
+                    <div class="public-header-left" style="display:flex; align-items:center; gap: 1.25rem; z-index: 2;">
+                        <div class="nav-brand" style="margin: 0; padding: 0;">
+                            <img src="img/logo.png" alt="<?= Lang::get('bnet_monitor_public') ?>"
+                                style="height: 28px; width: auto; max-width: 140px; object-fit: contain;"
+                                onerror="this.outerHTML='<h1 style=\'margin: 0; font-size: 1.05rem;\'><?= Lang::get('bnet_monitor_public') ?></h1>'">
+                        </div>
+                        <!-- Navigation Tabs -->
+                        <div class="public-tabs-nav" role="tablist">
+                            <button type="button" class="public-tab-btn active" id="tabBtnDashboard" data-tab="dashboard">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                                <span><?= Lang::get('tab_dashboard') ?></span>
+                            </button>
+                            <button type="button" class="public-tab-btn" id="tabBtnAnalytics" data-tab="analytics">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                                <span><?= Lang::get('tab_analytics') ?></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Centered Clock / Date -->
+                    <div class="public-header-center">
+                        <span id="clock" class="public-clock-badge">--:--:--</span>
+                    </div>
+
+                    <div class="public-header-right" style="display:flex; gap: 0.5rem; align-items:center; flex-wrap: wrap; justify-content: flex-end; z-index: 2;">
+                        <div id="dashboardControls" style="display:flex; gap: 0.5rem; align-items:center;">
+                            <select id="sortSelect" class="form-select"
+                                style="width: auto; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.78rem; background: var(--bg-input); color: white; border: 1px solid var(--border);">
+                                <option value="status"><?= Lang::get('sort_offline_first') ?></option>
+                                <option value="name"><?= Lang::get('sort_name') ?></option>
+                            </select>
+                            <button id="tvModeBtn" class="btn btn-secondary btn-sm"
+                                style="padding: 0.2rem 0.5rem; font-size: 0.78rem; white-space: nowrap;"><?= Lang::get('tv_view') ?>:
+                                ON</button>
+                        </div>
+                        <button id="enableAudioBtn" class="btn btn-primary btn-sm"
+                            style="padding: 0.2rem 0.5rem; font-size: 0.78rem; white-space: nowrap;"><?= Lang::get('enable_audio') ?></button>
+                        <div id="hostSummary"
+                            style="font-size: 0.78rem; font-weight: bold; display: flex; gap: 0.4rem; white-space: nowrap;">
+                        </div>
+                        <div style="display:inline-block; border-left:1px solid var(--border); padding-left:0.4rem; margin-left:0.2rem;">
+                            <a href="?page=set_lang&lang=en" style="padding:0.15rem 0.3rem; font-size:0.78rem; text-decoration:none; color:<?= Lang::getLanguage() === 'en' ? 'var(--accent)' : 'var(--text-muted)' ?>; font-weight:<?= Lang::getLanguage() === 'en' ? 'bold' : 'normal' ?>;">EN</a>
+                            <span style="color:var(--border);">|</span>
+                            <a href="?page=set_lang&lang=pt" style="padding:0.15rem 0.3rem; font-size:0.78rem; text-decoration:none; color:<?= Lang::getLanguage() === 'pt' ? 'var(--accent)' : 'var(--text-muted)' ?>; font-weight:<?= Lang::getLanguage() === 'pt' ? 'bold' : 'normal' ?>;">PT</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 1: DASHBOARD VIEW -->
+                <div id="publicDashboardView" style="display: block; flex: 1; min-height: 0; overflow: hidden; height: 100%;">
+                    <div class="public-grid" id="publicGrid"
+                        style="display: grid; height: 100%; gap: 0.35rem; padding: 0.35rem 0.5rem 0.5rem 0.5rem; overflow: hidden;">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- TAB 2: ANALYTICS VIEW -->
+                <div id="publicAnalyticsView" style="display: none;">
+                    <!-- 3 Charts Side-by-Side Row -->
+                    <div class="analytics-charts-grid">
+                        <!-- Chart 1: Status Distribution (Pie / Donut) -->
+                        <div class="analytics-card" style="min-width: 0;">
+                            <div class="analytics-card-header">
+                                <div class="analytics-card-title">
+                                    <span class="card-icon">🥧</span>
+                                    <div>
+                                        <h3><?= Lang::get('chart_status_title') ?></h3>
+                                        <span class="card-subtitle"><?= Lang::get('total_hosts_count') ?>: <strong id="statusTotalHosts">--</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <canvas id="statusPieChart"></canvas>
+                            </div>
+                            <div class="analytics-status-badges" id="statusBadgesRow">
+                                <span class="status-pill status-pill-online"><span class="dot"></span> <?= Lang::get('chart_status_online') ?>: <b id="cntOnline">0</b></span>
+                                <span class="status-pill status-pill-offline"><span class="dot"></span> <?= Lang::get('chart_status_offline') ?>: <b id="cntOffline">0</b></span>
+                                <span class="status-pill status-pill-disabled"><span class="dot"></span> <?= Lang::get('chart_status_disabled') ?>: <b id="cntDisabled">0</b></span>
+                                <span class="status-pill status-pill-unknown"><span class="dot"></span> <?= Lang::get('chart_status_unknown') ?>: <b id="cntUnknown">0</b></span>
+                            </div>
+                        </div>
+
+                        <!-- Chart 2: Top 10 Offline Hosts (Bar) -->
+                        <div class="analytics-card" style="min-width: 0;">
+                            <div class="analytics-card-header">
+                                <div class="analytics-card-title">
+                                    <span class="card-icon">📊</span>
+                                    <div>
+                                        <h3><?= Lang::get('chart_top10_title') ?></h3>
+                                        <span class="card-subtitle"><?= Lang::get('chart_top10_subtitle') ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <canvas id="topOfflineBarChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Chart 3: 30-Day Online vs Offline (Line) -->
+                        <div class="analytics-card" style="min-width: 0;">
+                            <div class="analytics-card-header">
+                                <div class="analytics-card-title">
+                                    <span class="card-icon">📈</span>
+                                    <div>
+                                        <h3><?= Lang::get('chart_history_title') ?></h3>
+                                        <span class="card-subtitle"><?= Lang::get('chart_history_subtitle') ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <canvas id="historyLineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Section: Dynamic Table of Offline Events -->
+                    <div class="analytics-card table-card">
+                        <div class="analytics-table-header">
+                            <div class="table-title-group">
+                                <span class="card-icon">🚨</span>
+                                <h3 style="margin:0;"><?= Lang::get('table_offline_title') ?></h3>
+                                <span class="pulse-badge" id="offlineCounterBadge">0</span>
+                                <span class="live-indicator"><span class="live-dot"></span> <?= Lang::get('live_badge') ?></span>
+                            </div>
+                            <div class="table-actions-group">
+                                <div class="table-filter-pills">
+                                    <button type="button" class="filter-pill active" id="btnFilterOngoing" data-filter="ongoing">
+                                        🔴 <?= Lang::get('table_filter_ongoing') ?> (<span id="countFilterOngoing">0</span>)
+                                    </button>
+                                    <button type="button" class="filter-pill" id="btnFilterAll" data-filter="all">
+                                        📋 <?= Lang::get('table_filter_all') ?> (<span id="countFilterAll">0</span>)
+                                    </button>
+                                </div>
+                                <div class="table-search-box">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    <input type="text" id="offlineTableSearch" placeholder="<?= Lang::get('table_search_placeholder') ?>" class="analytics-search-input">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Scrollable Table Container -->
+                        <div class="analytics-table-container" id="analyticsTableContainer">
+                            <table class="analytics-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 130px;"><?= Lang::get('table_col_status') ?></th>
+                                        <th><?= Lang::get('table_col_host') ?></th>
+                                        <th style="width: 160px;"><?= Lang::get('table_col_start') ?></th>
+                                        <th style="width: 150px;"><?= Lang::get('table_col_duration') ?></th>
+                                        <th style="width: 230px;"><?= Lang::get('table_col_state') ?></th>
+                                        <th style="width: 100px; text-align: center;"><?= Lang::get('table_col_action') ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="offlineEventsTableBody">
+                                    <!-- Populated dynamically by JS -->
+                                </tbody>
+                            </table>
+                            <div id="offlineTableEmpty" style="display:none; text-align:center; padding: 2.5rem 1rem; color: var(--text-muted);">
+                                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
+                                <p style="font-weight: 500; font-size: 1rem;"><?= Lang::get('table_no_offline') ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script src="js/public.js?v=<?= APP_VERSION ?>"></script>
         <?php elseif ($page === 'map'): ?>
-            <div class="dashboard-header">
-                <h2><?= Lang::get('nav_map') ?></h2>
-                <div class="dashboard-controls" style="display: flex; gap: 1rem;">
-                    <select id="mapStatusFilter" class="form-select">
-                        <option value="all"><?= Lang::get('filter_all') ?></option>
-                        <option value="offline"><?= Lang::get('offline') ?></option>
-                        <option value="online"><?= Lang::get('online') ?></option>
-                    </select>
-                    <input type="text" id="mapSearchInput" placeholder="<?= Lang::get('search_placeholder') ?>"
-                        class="search-input" style="min-width: 250px;">
-                    <button class="btn btn-secondary" onclick="mapRefresh()" title="<?= Lang::get('btn_refresh') ?>"
-                        style="display: flex; align-items: center; justify-content: center; padding: 0.5rem 0.8rem; border-radius: 6px;">
-                        <svg id="mapRefreshIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round" style="transition: opacity 0.3s ease;">
-                            <polyline points="23 4 23 10 17 10"></polyline>
-                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                        </svg>
-                    </button>
+                <div class="dashboard-header">
+                    <h2><?= Lang::get('nav_map') ?></h2>
+                    <div class="dashboard-controls" style="display: flex; gap: 1rem;">
+                        <select id="mapStatusFilter" class="form-select">
+                            <option value="all"><?= Lang::get('filter_all') ?></option>
+                            <option value="offline"><?= Lang::get('offline') ?></option>
+                            <option value="online"><?= Lang::get('online') ?></option>
+                        </select>
+                        <input type="text" id="mapSearchInput" placeholder="<?= Lang::get('search_placeholder') ?>"
+                            class="search-input" style="min-width: 250px;">
+                        <button class="btn btn-secondary" onclick="mapRefresh()" title="<?= Lang::get('btn_refresh') ?>"
+                            style="display: flex; align-items: center; justify-content: center; padding: 0.5rem 0.8rem; border-radius: 6px;">
+                            <svg id="mapRefreshIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" style="transition: opacity 0.3s ease;">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-                integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-                integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-            <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-            <div id="map"
-                style="width: 100%; height: calc(90vh - 150px); border-radius: 8px; border: 1px solid var(--border); z-index: 1;">
-            </div>
-            <style>
-                .host-tooltip {
-                    background: transparent;
-                    border: none;
-                    box-shadow: none;
-                    color: white;
-                    font-weight: 600;
-                    font-size: 0.85rem;
-                    text-shadow: 1px 1px 2px black, -1px -1px 2px black, 1px -1px 2px black, -1px 1px 2px black;
-                }
-
-                .leaflet-tooltip-left.host-tooltip::before,
-                .leaflet-tooltip-right.host-tooltip::before,
-                .leaflet-tooltip-top.host-tooltip::before,
-                .leaflet-tooltip-bottom.host-tooltip::before {
-                    display: none;
-                }
-
-                @keyframes pulseGreen {
-                    0% {
-                        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+                <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+                <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+                <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+                <div id="map"
+                    style="width: 100%; height: calc(90vh - 150px); border-radius: 8px; border: 1px solid var(--border); z-index: 1;">
+                </div>
+                <style>
+                    .host-tooltip {
+                        background: transparent;
+                        border: none;
+                        box-shadow: none;
+                        color: white;
+                        font-weight: 600;
+                        font-size: 0.85rem;
+                        text-shadow: 1px 1px 2px black, -1px -1px 2px black, 1px -1px 2px black, -1px 1px 2px black;
                     }
 
-                    70% {
-                        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+                    .leaflet-tooltip-left.host-tooltip::before,
+                    .leaflet-tooltip-right.host-tooltip::before,
+                    .leaflet-tooltip-top.host-tooltip::before,
+                    .leaflet-tooltip-bottom.host-tooltip::before {
+                        display: none;
                     }
 
-                    100% {
-                        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-                    }
-                }
+                    @keyframes pulseGreen {
+                        0% {
+                            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+                        }
 
-                @keyframes pulseRed {
-                    0% {
-                        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                        70% {
+                            box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+                        }
+
+                        100% {
+                            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+                        }
                     }
 
-                    70% {
-                        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+                    @keyframes pulseRed {
+                        0% {
+                            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                        }
+
+                        70% {
+                            box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+                        }
+
+                        100% {
+                            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+                        }
                     }
 
-                    100% {
-                        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+                    .custom-div-icon {
+                        overflow: visible !important;
                     }
-                }
-
-                .custom-div-icon {
-                    overflow: visible !important;
-                }
-            </style>
-            <script src="js/map.js?v=1.3"></script>
+                </style>
+                <script src="js/map.js?v=1.3"></script>
         <?php elseif ($page === 'host' && isset($_GET['id'])):
             $host = Host::getById($_GET['id']);
             if (!$host)
                 die('Host not found');
             ?>
-            <div class="host-details-header">
-                <h2><?= htmlspecialchars($host['name']) ?> <span
-                        class="host-ip">(<?= htmlspecialchars($host['ip']) ?>)</span></h2>
-                <div class="period-selector">
-                    <a href="?page=host&id=<?= $host['id'] ?>&period=1"
-                        class="btn <?= (!isset($_GET['period']) || $_GET['period'] == 1) ? 'btn-active' : '' ?>"><?= Lang::get('period_1h') ?></a>
-                    <a href="?page=host&id=<?= $host['id'] ?>&period=24"
-                        class="btn <?= (isset($_GET['period']) && $_GET['period'] == 24) ? 'btn-active' : '' ?>"><?= Lang::get('period_24h') ?></a>
-                    <a href="?page=host&id=<?= $host['id'] ?>&period=168"
-                        class="btn <?= (isset($_GET['period']) && $_GET['period'] == 168) ? 'btn-active' : '' ?>"><?= Lang::get('period_1w') ?></a>
-                    <a href="?page=host&id=<?= $host['id'] ?>&period=720"
-                        class="btn <?= (isset($_GET['period']) && $_GET['period'] == 720) ? 'btn-active' : '' ?>"><?= Lang::get('period_1m') ?></a>
-                </div>
-            </div>
-            <div class="charts-container">
-                <div class="chart-box">
-                    <canvas id="latencyChart"></canvas>
-                </div>
-                <div class="chart-box">
-                    <canvas id="packetLossChart"></canvas>
-                </div>
-                <div class="chart-box">
-                    <canvas id="jitterChart"></canvas>
-                </div>
-            </div>
-
-            <div class="history-table-container">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 id="hostHistoryTitle" style="margin: 0; padding: 0; border: none;">
-                        <?= Lang::get('host_history_title') ?>
-                    </h3>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <button id="toggleArchiveHostBtn" class="btn btn-primary btn-sm"
-                            style="white-space: nowrap;"><?= Lang::get('btn_old_downtimes') ?></button>
-                        <input type="text" id="hostHistorySearch" placeholder="<?= Lang::get('search_date_time') ?>"
-                            class="search-input" style="max-width: 250px;">
+                <div class="host-details-header">
+                    <h2><?= htmlspecialchars($host['name']) ?> <span
+                            class="host-ip">(<?= htmlspecialchars($host['ip']) ?>)</span></h2>
+                    <div class="period-selector">
+                        <a href="?page=host&id=<?= $host['id'] ?>&period=1"
+                            class="btn <?= (!isset($_GET['period']) || $_GET['period'] == 1) ? 'btn-active' : '' ?>"><?= Lang::get('period_1h') ?></a>
+                        <a href="?page=host&id=<?= $host['id'] ?>&period=24"
+                            class="btn <?= (isset($_GET['period']) && $_GET['period'] == 24) ? 'btn-active' : '' ?>"><?= Lang::get('period_24h') ?></a>
+                        <a href="?page=host&id=<?= $host['id'] ?>&period=168"
+                            class="btn <?= (isset($_GET['period']) && $_GET['period'] == 168) ? 'btn-active' : '' ?>"><?= Lang::get('period_1w') ?></a>
+                        <a href="?page=host&id=<?= $host['id'] ?>&period=720"
+                            class="btn <?= (isset($_GET['period']) && $_GET['period'] == 720) ? 'btn-active' : '' ?>"><?= Lang::get('period_1m') ?></a>
                     </div>
                 </div>
-                <table class="history-table" id="hostHistoryTable">
-                    <thead>
-                        <tr>
-                            <th style="cursor:pointer; user-select:none;" data-sort="date">
-                                <?= Lang::get('date_time_from') ?> ↕
-                            </th>
-                            <th><?= Lang::get('date_time_to') ?></th>
-                            <th><?= Lang::get('duration') ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="3" class="text-muted text-center"><?= Lang::get('loading') ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div id="hostHistoryPagination"
-                    style="margin-top: 1rem; display: flex; justify-content: center; gap: 0.5rem; align-items: center;">
+                <div class="charts-container">
+                    <div class="chart-box">
+                        <canvas id="latencyChart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="packetLossChart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="jitterChart"></canvas>
+                    </div>
                 </div>
-            </div>
 
-            <script>
-                const hostId = <?= $host['id'] ?>;
-                const period = <?= $_GET['period'] ?? 1 ?>;
-            </script>
-            <script src="js/host.js?v=1.3"></script>
-        <?php elseif ($page === 'reports'):
-            $hosts = Host::getAll();
-            ?>
-            <div class="dashboard-header">
-                <h2><?= Lang::get('report_gen_title') ?></h2>
-            </div>
-
-            <div class="settings-card">
-                <h3><?= Lang::get('report_export_data') ?></h3>
-                <form id="reportForm" method="GET" action="?">
-                    <input type="hidden" name="page" id="reportPageAction" value="export_csv">
-
-                    <div class="form-group">
-                        <label><?= Lang::get('report_type') ?></label>
-                        <select name="type" class="form-select" style="width: 100%;">
-                            <option value="downtime"><?= Lang::get('report_downtime') ?></option>
-                            <option value="stats"><?= Lang::get('report_stats') ?></option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label><?= Lang::get('report_target_host') ?></label>
-                        <select name="host_id" class="form-select" style="width: 100%;">
-                            <option value=""><?= Lang::get('report_all_hosts') ?></option>
-                            <?php foreach ($hosts as $h): ?>
-                                <option value="<?= $h['id'] ?>"><?= htmlspecialchars($h['name']) ?>
-                                    (<?= htmlspecialchars($h['ip']) ?>)</option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div class="form-group" style="display: flex; gap: 1rem;">
-                        <div style="flex: 1;">
-                            <label><?= Lang::get('report_start_date') ?></label>
-                            <input type="datetime-local" name="start_date" class="form-control"
-                                style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--bg-input); color: white;">
-                        </div>
-                        <div style="flex: 1;">
-                            <label><?= Lang::get('report_end_date') ?></label>
-                            <input type="datetime-local" name="end_date" class="form-control"
-                                style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--bg-input); color: white;">
+                <div class="history-table-container">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 id="hostHistoryTitle" style="margin: 0; padding: 0; border: none;">
+                            <?= Lang::get('host_history_title') ?>
+                        </h3>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button id="toggleArchiveHostBtn" class="btn btn-primary btn-sm"
+                                style="white-space: nowrap;"><?= Lang::get('btn_old_downtimes') ?></button>
+                            <input type="text" id="hostHistorySearch" placeholder="<?= Lang::get('search_date_time') ?>"
+                                class="search-input" style="max-width: 250px;">
                         </div>
                     </div>
-
-                    <div class="form-group" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                        <button type="button" class="btn btn-primary" onclick="submitReport('export_pdf')"
-                            style="flex: 1;"><?= Lang::get('btn_gen_pdf') ?></button>
-                        <button type="button" class="btn btn-success" onclick="submitReport('export_csv')"
-                            style="flex: 1;"><?= Lang::get('btn_exp_csv') ?></button>
-                    </div>
-                </form>
-            </div>
-            <script>
-                function submitReport(actionPage) {
-                    const form = document.getElementById('reportForm');
-                    document.getElementById('reportPageAction').value = actionPage;
-                    if (actionPage === 'export_pdf') {
-                        form.target = '_blank'; // open PDF generator in new tab so it can download
-                    } else {
-                        form.target = '_self';
-                    }
-                    form.submit();
-                }
-            </script>
-        <?php elseif ($page === 'settings'): ?>
-            <?php if (isset($_SESSION['settings_error'])): ?>
-                <div class="alert alert-error">
-                    <?= htmlspecialchars($_SESSION['settings_error']);
-                    unset($_SESSION['settings_error']); ?>
-                </div>
-            <?php endif; ?>
-            <?php if (isset($_SESSION['settings_success'])): ?>
-                <div class="alert"
-                    style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">
-                    <?= htmlspecialchars($_SESSION['settings_success']);
-                    unset($_SESSION['settings_success']); ?>
-                </div>
-            <?php endif; ?>
-
-            <div class="tabs">
-                <?php if (Auth::isAdmin()): ?>
-                    <button class="tab-button active"
-                        onclick="openTab(event, 'sysConfig')"><?= Lang::get('tab_sys_config') ?></button>
-                <?php endif; ?>
-                <button class="tab-button <?= Auth::isAdmin() ? '' : 'active' ?>"
-                    onclick="openTab(event, 'hostMgmt')"><?= Lang::get('tab_host_mgmt') ?></button>
-                <button class="tab-button" onclick="openTab(event, 'userMgmt')"><?= Lang::get('tab_user_mgmt') ?></button>
-            </div>
-
-            <?php if (Auth::isAdmin()): ?>
-                <div id="sysConfig" class="tab-content active">
-                    <!-- System Config -->
-                    <div class="settings-card">
-                        <h3><?= Lang::get('tab_sys_config') ?></h3>
-                        <form method="POST" action="?page=settings" enctype="multipart/form-data">
-                            <input type="hidden" name="action" value="update_settings">
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_ping_interval') ?></label>
-                                <input type="number" name="ping_interval"
-                                    value="<?= htmlspecialchars($settings['ping_interval'] ?? '60') ?>" min="10">
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_ping_count') ?></label>
-                                <input type="number" name="ping_count"
-                                    value="<?= htmlspecialchars($settings['ping_count'] ?? '4') ?>" min="1" max="10">
-                            </div>
-
-                            <div class="divider"></div>
-                            <h4><?= Lang::get('sys_cf_turnstile') ?></h4>
-                            <div class="form-group toggle-group">
-                                <label class="switch">
-                                    <input type="checkbox" name="turnstile_enabled" <?= (isset($settings['turnstile_enabled']) && $settings['turnstile_enabled'] == '1') ? 'checked' : '' ?>>
-                                    <span class="slider round"></span>
-                                </label>
-                                <span><?= Lang::get('sys_cf_enable') ?></span>
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_site_key') ?></label>
-                                <div style="position: relative; display: flex; align-items: center;">
-                                    <input type="password" name="turnstile_site_key" id="ts_site_key"
-                                        value="<?= htmlspecialchars($settings['turnstile_site_key'] ?? '') ?>"
-                                        style="width: 100%; padding-right: 40px;">
-                                    <button type="button" onclick="togglePassword('ts_site_key')"
-                                        style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text);">👁️</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_secret_key') ?></label>
-                                <div style="position: relative; display: flex; align-items: center;">
-                                    <input type="password" name="turnstile_secret_key" id="ts_sec_key"
-                                        value="<?= htmlspecialchars($settings['turnstile_secret_key'] ?? '') ?>"
-                                        style="width: 100%; padding-right: 40px;">
-                                    <button type="button" onclick="togglePassword('ts_sec_key')"
-                                        style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text);">👁️</button>
-                                </div>
-                            </div>
-
-                            <div class="divider"></div>
-                            <h4><?= Lang::get('sys_waha') ?></h4>
-                            <div class="form-group toggle-group">
-                                <label class="switch">
-                                    <input type="checkbox" name="waha_enabled" <?= (isset($settings['waha_enabled']) && $settings['waha_enabled'] == '1') ? 'checked' : '' ?>>
-                                    <span class="slider round"></span>
-                                </label>
-                                <span><?= Lang::get('sys_waha_enable') ?></span>
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_api_url') ?></label>
-                                <input type="text" name="waha_url" value="<?= htmlspecialchars($settings['waha_url'] ?? '') ?>"
-                                    placeholder="http://localhost:3001/api/sendText">
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_api_key') ?></label>
-                                <div style="position: relative; display: flex; align-items: center;">
-                                    <input type="password" name="waha_api_key" id="waha_api_key_input"
-                                        value="<?= htmlspecialchars($settings['waha_api_key'] ?? '') ?>"
-                                        style="width: 100%; padding-right: 40px;">
-                                    <button type="button" onclick="togglePassword('waha_api_key_input')"
-                                        style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text);">👁️</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_chat_id') ?></label>
-                                <input type="text" name="waha_chat_id"
-                                    value="<?= htmlspecialchars($settings['waha_chat_id'] ?? '') ?>"
-                                    placeholder="xxxxxxxx@g.us">
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_session_name') ?></label>
-                                <input type="text" name="waha_session"
-                                    value="<?= htmlspecialchars($settings['waha_session'] ?? 'default') ?>">
-                            </div>
-
-                            <div class="divider"></div>
-                            <h4><?= Lang::get('sys_audio_alerts') ?></h4>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_audio_normal') ?></label>
-                                <input type="file" name="audio_normal" accept="audio/mpeg, audio/wav"
-                                    style="color: var(--text);">
-                                <?php if (!empty($settings['audio_normal'])): ?>
-                                    <small style="display:block; margin-top:0.5rem; color:var(--success);">Current:
-                                        <?= htmlspecialchars($settings['audio_normal']) ?></small>
-                                    <label
-                                        style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.9em; font-weight: normal; cursor: pointer;">
-                                        <input type="checkbox" name="delete_audio_normal" value="1">
-                                        <?= Lang::get('btn_delete') ?? 'Delete current audio' ?>
-                                    </label>
-                                <?php endif; ?>
-                            </div>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_audio_critical') ?></label>
-                                <input type="file" name="audio_critical" accept="audio/mpeg, audio/wav"
-                                    style="color: var(--text);">
-                                <?php if (!empty($settings['audio_critical'])): ?>
-                                    <small style="display:block; margin-top:0.5rem; color:var(--success);">Current:
-                                        <?= htmlspecialchars($settings['audio_critical']) ?></small>
-                                    <label
-                                        style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.9em; font-weight: normal; cursor: pointer;">
-                                        <input type="checkbox" name="delete_audio_critical" value="1">
-                                        <?= Lang::get('btn_delete') ?? 'Delete current audio' ?>
-                                    </label>
-                                <?php endif; ?>
-                            </div>
-
-                            <div class="divider"></div>
-                            <h4>Application Settings</h4>
-                            <div class="form-group">
-                                <label><?= Lang::get('sys_app_url') ?></label>
-                                <input type="text" name="app_url"
-                                    value="<?= htmlspecialchars($settings['app_url'] ?? 'http://localhost/ping') ?>"
-                                    placeholder="http://your-domain.com/ping">
-                            </div>
-
-                            <button type="submit" class="btn btn-primary"><?= Lang::get('btn_save_config') ?></button>
-                        </form>
-                        <script>
-                            function togglePassword(id) {
-                                const el = document.getElementById(id);
-                                if (el.type === 'password') {
-                                    el.type = 'text';
-                                } else {
-                                    el.type = 'password';
-                                }
-                            }
-                        </script>
-                        <div class="divider"></div>
-                        <h4><?= Lang::get('sys_data_mgmt') ?></h4>
-                        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                            <form method="POST" action="?page=settings"
-                                onsubmit="return confirm(window.i18n.js_confirm_clear);">
-                                <input type="hidden" name="action" value="clear_stats">
-                                <button type="submit" class="btn btn-warning"
-                                    style="background-color: #f59e0b; color: white;"><?= Lang::get('btn_clear_stats') ?></button>
-                            </form>
-                            <form method="POST" action="?page=settings"
-                                onsubmit="return confirm(window.i18n.js_confirm_reset);">
-                                <input type="hidden" name="action" value="factory_reset">
-                                <button type="submit" class="btn btn-danger"><?= Lang::get('btn_factory_reset') ?></button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <div id="hostMgmt" class="tab-content<?= Auth::isAdmin() ? '' : ' active' ?>">
-                <!-- Host Management -->
-                <div class="settings-card">
-                    <h3><?= Lang::get('tab_host_mgmt') ?></h3>
-                    <form method="POST" action="?page=settings" class="add-host-form">
-                        <input type="hidden" name="action" value="add_host">
-                        <div class="input-group">
-                            <input type="text" name="name" placeholder="<?= Lang::get('host_name') ?>" required>
-                            <input type="text" name="ip" placeholder="<?= Lang::get('host_ip') ?>" required>
-                            <input type="text" name="latitude" placeholder="<?= Lang::get('host_lat') ?>">
-                            <input type="text" name="longitude" placeholder="<?= Lang::get('host_lng') ?>">
-                            <button type="submit" class="btn btn-success"><?= Lang::get('btn_add_host') ?></button>
-                        </div>
-                    </form>
-
-                    <div style="margin-bottom: 1rem; margin-top: 1rem;">
-                        <input type="text" id="hostMgmtSearch" placeholder="Search hosts by name or IP..."
-                            class="search-input" style="width: 100%; max-width: 100%;">
-                    </div>
-                    <div class="hosts-list">
-                        <?php foreach (Host::getAll() as $h): ?>
-                            <div class="host-item">
-                                <div class="host-info" id="host_info_<?= $h['id'] ?>">
-                                    <span class="host-name">
-                                        <?= htmlspecialchars($h['name']) ?>
-                                        <?php if (isset($h['active']) && $h['active'] == '0')
-                                            echo '<span class="text-muted" style="font-size: 0.8em; margin-left: 0.5rem;">(Disabled)</span>'; ?>
-                                    </span>
-                                    <span class="host-ip text-muted"><?= htmlspecialchars($h['ip']) ?></span>
-                                </div>
-                                <div class="host-edit-form" id="host_edit_<?= $h['id'] ?>"
-                                    style="display:none; flex:1; margin-right:1rem;">
-                                    <form method="POST" action="?page=settings" style="display:flex; gap:0.5rem; width:100%;">
-                                        <input type="hidden" name="action" value="edit_host">
-                                        <input type="hidden" name="id" value="<?= $h['id'] ?>">
-                                        <input type="text" name="name" value="<?= htmlspecialchars($h['name']) ?>" required
-                                            style="flex:1;">
-                                        <input type="text" name="ip" value="<?= htmlspecialchars($h['ip']) ?>" required
-                                            style="flex:1;">
-                                        <input type="text" name="latitude" value="<?= htmlspecialchars($h['latitude'] ?? '') ?>"
-                                            placeholder="<?= Lang::get('host_lat') ?>" style="flex:1; max-width: 150px;">
-                                        <input type="text" name="longitude"
-                                            value="<?= htmlspecialchars($h['longitude'] ?? '') ?>"
-                                            placeholder="<?= Lang::get('host_lng') ?>" style="flex:1; max-width: 150px;">
-                                        <button type="submit"
-                                            class="btn btn-success btn-sm"><?= Lang::get('btn_save') ?></button>
-                                        <button type="button" class="btn btn-danger btn-sm"
-                                            onclick="toggleEdit(<?= $h['id'] ?>)"><?= Lang::get('btn_cancel') ?></button>
-                                    </form>
-                                </div>
-                                <div class="host-actions" id="host_actions_<?= $h['id'] ?>" style="display:flex; gap:0.5rem;">
-                                    <button type="button" class="btn btn-primary btn-sm"
-                                        onclick="toggleEdit(<?= $h['id'] ?>)"><?= Lang::get('btn_edit') ?></button>
-                                    <form method="POST" action="?page=settings">
-                                        <input type="hidden" name="action" value="toggle_active_host">
-                                        <input type="hidden" name="id" value="<?= $h['id'] ?>">
-                                        <input type="hidden" name="active"
-                                            value="<?= isset($h['active']) && $h['active'] == '0' ? '1' : '0' ?>">
-                                        <button type="submit"
-                                            class="btn <?= isset($h['active']) && $h['active'] == '0' ? 'btn-success' : 'btn-warning' ?> btn-sm">
-                                            <?= isset($h['active']) && $h['active'] == '0' ? Lang::get('btn_enable') : Lang::get('btn_disable') ?>
-                                        </button>
-                                    </form>
-                                    <form method="POST" action="?page=settings"
-                                        onsubmit="return confirm(window.i18n.js_confirm_delete_host)">
-                                        <input type="hidden" name="action" value="delete_host">
-                                        <input type="hidden" name="id" value="<?= $h['id'] ?>">
-                                        <button type="submit"
-                                            class="btn btn-danger btn-sm"><?= Lang::get('btn_delete') ?></button>
-                                    </form>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+                    <table class="history-table" id="hostHistoryTable">
+                        <thead>
+                            <tr>
+                                <th style="cursor:pointer; user-select:none;" data-sort="date">
+                                    <?= Lang::get('date_time_from') ?> ↕
+                                </th>
+                                <th><?= Lang::get('date_time_to') ?></th>
+                                <th><?= Lang::get('duration') ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="3" class="text-muted text-center"><?= Lang::get('loading') ?></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div id="hostHistoryPagination"
+                        style="margin-top: 1rem; display: flex; justify-content: center; gap: 0.5rem; align-items: center;">
                     </div>
                 </div>
 
                 <script>
-                    document.getElementById('hostMgmtSearch').addEventListener('input', function (e) {
-                        const term = e.target.value.toLowerCase();
-                        const items = document.querySelectorAll('.hosts-list .host-item');
-                        items.forEach(item => {
-                            const name = item.querySelector('.host-name').textContent.toLowerCase();
-                            const ip = item.querySelector('.host-ip').textContent.toLowerCase();
-                            if (name.includes(term) || ip.includes(term)) {
-                                item.style.display = 'flex';
-                            } else {
-                                item.style.display = 'none';
-                            }
-                        });
-                    });
+                    const hostId = <?= $host['id'] ?>;
+                    const period = <?= $_GET['period'] ?? 1 ?>;
+                </script>
+                <script src="js/host.js?v=1.3"></script>
+        <?php elseif ($page === 'reports'):
+            $hosts = Host::getAll();
+            ?>
+                <div class="dashboard-header">
+                    <h2><?= Lang::get('report_gen_title') ?></h2>
+                </div>
 
-                    function toggleEdit(id) {
-                        const info = document.getElementById('host_info_' + id);
-                        const edit = document.getElementById('host_edit_' + id);
-                        const actions = document.getElementById('host_actions_' + id);
+                <div class="settings-card">
+                    <h3><?= Lang::get('report_export_data') ?></h3>
+                    <form id="reportForm" method="GET" action="?">
+                        <input type="hidden" name="page" id="reportPageAction" value="export_csv">
 
-                        if (info.style.display === 'none') {
-                            info.style.display = 'flex';
-                            actions.style.display = 'flex';
-                            edit.style.display = 'none';
+                        <div class="form-group">
+                            <label><?= Lang::get('report_type') ?></label>
+                            <select name="type" class="form-select" style="width: 100%;">
+                                <option value="downtime"><?= Lang::get('report_downtime') ?></option>
+                                <option value="stats"><?= Lang::get('report_stats') ?></option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label><?= Lang::get('report_target_host') ?></label>
+                            <select name="host_id" class="form-select" style="width: 100%;">
+                                <option value=""><?= Lang::get('report_all_hosts') ?></option>
+                                <?php foreach ($hosts as $h): ?>
+                                        <option value="<?= $h['id'] ?>"><?= htmlspecialchars($h['name']) ?>
+                                            (<?= htmlspecialchars($h['ip']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="display: flex; gap: 1rem;">
+                            <div style="flex: 1;">
+                                <label><?= Lang::get('report_start_date') ?></label>
+                                <input type="datetime-local" name="start_date" class="form-control"
+                                    style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--bg-input); color: white;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label><?= Lang::get('report_end_date') ?></label>
+                                <input type="datetime-local" name="end_date" class="form-control"
+                                    style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--bg-input); color: white;">
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                            <button type="button" class="btn btn-primary" onclick="submitReport('export_pdf')"
+                                style="flex: 1;"><?= Lang::get('btn_gen_pdf') ?></button>
+                            <button type="button" class="btn btn-success" onclick="submitReport('export_csv')"
+                                style="flex: 1;"><?= Lang::get('btn_exp_csv') ?></button>
+                        </div>
+                    </form>
+                </div>
+                <script>
+                    function submitReport(actionPage) {
+                        const form = document.getElementById('reportForm');
+                        document.getElementById('reportPageAction').value = actionPage;
+                        if (actionPage === 'export_pdf') {
+                            form.target = '_blank'; // open PDF generator in new tab so it can download
                         } else {
-                            info.style.display = 'none';
-                            actions.style.display = 'none';
-                            edit.style.display = 'flex';
+                            form.target = '_self';
                         }
+                        form.submit();
                     }
                 </script>
+        <?php elseif ($page === 'settings'): ?>
+                <?php if (isset($_SESSION['settings_error'])): ?>
+                        <div class="alert alert-error">
+                            <?= htmlspecialchars($_SESSION['settings_error']);
+                            unset($_SESSION['settings_error']); ?>
+                        </div>
+                <?php endif; ?>
+                <?php if (isset($_SESSION['settings_success'])): ?>
+                        <div class="alert"
+                            style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">
+                            <?= htmlspecialchars($_SESSION['settings_success']);
+                            unset($_SESSION['settings_success']); ?>
+                        </div>
+                <?php endif; ?>
 
-                <!-- Import/Export Hosts -->
-                <div class="settings-card" style="margin-top: 2rem;">
-                    <h3 style="margin-top:0;"><?= Lang::get('host_import_title') ?></h3>
-                    <p class="text-muted mb-3"><?= Lang::get('host_import_format') ?></p>
-                    <div style="display: flex; flex-direction: column; gap: 1rem;">
-                        <form method="POST" action="?page=settings" enctype="multipart/form-data">
-                            <input type="hidden" name="action" value="import_csv">
-                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                                <input type="file" name="csv_file" accept=".csv" required class="file-input"
-                                    style="flex: 1; min-width: 200px;">
-                                <button type="submit" class="btn btn-primary"><?= Lang::get('btn_import_csv') ?></button>
+                <div class="tabs">
+                    <?php if (Auth::isAdmin()): ?>
+                            <button class="tab-button active"
+                                onclick="openTab(event, 'sysConfig')"><?= Lang::get('tab_sys_config') ?></button>
+                    <?php endif; ?>
+                    <button class="tab-button <?= Auth::isAdmin() ? '' : 'active' ?>"
+                        onclick="openTab(event, 'hostMgmt')"><?= Lang::get('tab_host_mgmt') ?></button>
+                    <button class="tab-button" onclick="openTab(event, 'userMgmt')"><?= Lang::get('tab_user_mgmt') ?></button>
+                </div>
+
+                <?php if (Auth::isAdmin()): ?>
+                        <div id="sysConfig" class="tab-content active">
+                            <!-- System Config -->
+                            <div class="settings-card">
+                                <h3><?= Lang::get('tab_sys_config') ?></h3>
+                                <form method="POST" action="?page=settings" enctype="multipart/form-data">
+                                    <input type="hidden" name="action" value="update_settings">
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_ping_interval') ?></label>
+                                        <input type="number" name="ping_interval"
+                                            value="<?= htmlspecialchars($settings['ping_interval'] ?? '60') ?>" min="10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_ping_count') ?></label>
+                                        <input type="number" name="ping_count"
+                                            value="<?= htmlspecialchars($settings['ping_count'] ?? '4') ?>" min="1" max="10">
+                                    </div>
+
+                                    <div class="divider"></div>
+                                    <h4><?= Lang::get('sys_cf_turnstile') ?></h4>
+                                    <div class="form-group toggle-group">
+                                        <label class="switch">
+                                            <input type="checkbox" name="turnstile_enabled" <?= (isset($settings['turnstile_enabled']) && $settings['turnstile_enabled'] == '1') ? 'checked' : '' ?>>
+                                            <span class="slider round"></span>
+                                        </label>
+                                        <span><?= Lang::get('sys_cf_enable') ?></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_site_key') ?></label>
+                                        <div style="position: relative; display: flex; align-items: center;">
+                                            <input type="password" name="turnstile_site_key" id="ts_site_key"
+                                                value="<?= htmlspecialchars($settings['turnstile_site_key'] ?? '') ?>"
+                                                style="width: 100%; padding-right: 40px;">
+                                            <button type="button" onclick="togglePassword('ts_site_key')"
+                                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text);">👁️</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_secret_key') ?></label>
+                                        <div style="position: relative; display: flex; align-items: center;">
+                                            <input type="password" name="turnstile_secret_key" id="ts_sec_key"
+                                                value="<?= htmlspecialchars($settings['turnstile_secret_key'] ?? '') ?>"
+                                                style="width: 100%; padding-right: 40px;">
+                                            <button type="button" onclick="togglePassword('ts_sec_key')"
+                                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text);">👁️</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="divider"></div>
+                                    <h4><?= Lang::get('sys_waha') ?></h4>
+                                    <div class="form-group toggle-group">
+                                        <label class="switch">
+                                            <input type="checkbox" name="waha_enabled" <?= (isset($settings['waha_enabled']) && $settings['waha_enabled'] == '1') ? 'checked' : '' ?>>
+                                            <span class="slider round"></span>
+                                        </label>
+                                        <span><?= Lang::get('sys_waha_enable') ?></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_api_url') ?></label>
+                                        <input type="text" name="waha_url" value="<?= htmlspecialchars($settings['waha_url'] ?? '') ?>"
+                                            placeholder="http://localhost:3001/api/sendText">
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_api_key') ?></label>
+                                        <div style="position: relative; display: flex; align-items: center;">
+                                            <input type="password" name="waha_api_key" id="waha_api_key_input"
+                                                value="<?= htmlspecialchars($settings['waha_api_key'] ?? '') ?>"
+                                                style="width: 100%; padding-right: 40px;">
+                                            <button type="button" onclick="togglePassword('waha_api_key_input')"
+                                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text);">👁️</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_chat_id') ?></label>
+                                        <input type="text" name="waha_chat_id"
+                                            value="<?= htmlspecialchars($settings['waha_chat_id'] ?? '') ?>"
+                                            placeholder="xxxxxxxx@g.us">
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_session_name') ?></label>
+                                        <input type="text" name="waha_session"
+                                            value="<?= htmlspecialchars($settings['waha_session'] ?? 'default') ?>">
+                                    </div>
+
+                                    <div class="divider"></div>
+                                    <h4><?= Lang::get('sys_audio_alerts') ?></h4>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_audio_normal') ?></label>
+                                        <input type="file" name="audio_normal" accept="audio/mpeg, audio/wav"
+                                            style="color: var(--text);">
+                                        <?php if (!empty($settings['audio_normal'])): ?>
+                                                <small style="display:block; margin-top:0.5rem; color:var(--success);">Current:
+                                                    <?= htmlspecialchars($settings['audio_normal']) ?></small>
+                                                <label
+                                                    style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.9em; font-weight: normal; cursor: pointer;">
+                                                    <input type="checkbox" name="delete_audio_normal" value="1">
+                                                    <?= Lang::get('btn_delete') ?? 'Delete current audio' ?>
+                                                </label>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_audio_critical') ?></label>
+                                        <input type="file" name="audio_critical" accept="audio/mpeg, audio/wav"
+                                            style="color: var(--text);">
+                                        <?php if (!empty($settings['audio_critical'])): ?>
+                                                <small style="display:block; margin-top:0.5rem; color:var(--success);">Current:
+                                                    <?= htmlspecialchars($settings['audio_critical']) ?></small>
+                                                <label
+                                                    style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.9em; font-weight: normal; cursor: pointer;">
+                                                    <input type="checkbox" name="delete_audio_critical" value="1">
+                                                    <?= Lang::get('btn_delete') ?? 'Delete current audio' ?>
+                                                </label>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <div class="divider"></div>
+                                    <h4>Application Settings</h4>
+                                    <div class="form-group">
+                                        <label><?= Lang::get('sys_app_url') ?></label>
+                                        <input type="text" name="app_url"
+                                            value="<?= htmlspecialchars($settings['app_url'] ?? 'http://localhost/ping') ?>"
+                                            placeholder="http://your-domain.com/ping">
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary"><?= Lang::get('btn_save_config') ?></button>
+                                </form>
+                                <script>
+                                    function togglePassword(id) {
+                                        const el = document.getElementById(id);
+                                        if (el.type === 'password') {
+                                            el.type = 'text';
+                                        } else {
+                                            el.type = 'password';
+                                        }
+                                    }
+                                </script>
+                                <div class="divider"></div>
+                                <h4><?= Lang::get('sys_data_mgmt') ?></h4>
+                                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                                    <form method="POST" action="?page=settings"
+                                        onsubmit="return confirm(window.i18n.js_confirm_clear);">
+                                        <input type="hidden" name="action" value="clear_stats">
+                                        <button type="submit" class="btn btn-warning"
+                                            style="background-color: #f59e0b; color: white;"><?= Lang::get('btn_clear_stats') ?></button>
+                                    </form>
+                                    <form method="POST" action="?page=settings"
+                                        onsubmit="return confirm(window.i18n.js_confirm_reset);">
+                                        <input type="hidden" name="action" value="factory_reset">
+                                        <button type="submit" class="btn btn-danger"><?= Lang::get('btn_factory_reset') ?></button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                <?php endif; ?>
+
+                <div id="hostMgmt" class="tab-content<?= Auth::isAdmin() ? '' : ' active' ?>">
+                    <!-- Host Management -->
+                    <div class="settings-card">
+                        <h3><?= Lang::get('tab_host_mgmt') ?></h3>
+                        <form method="POST" action="?page=settings" class="add-host-form">
+                            <input type="hidden" name="action" value="add_host">
+                            <div class="input-group">
+                                <input type="text" name="name" placeholder="<?= Lang::get('host_name') ?>" required>
+                                <input type="text" name="ip" placeholder="<?= Lang::get('host_ip') ?>" required>
+                                <input type="text" name="latitude" placeholder="<?= Lang::get('host_lat') ?>">
+                                <input type="text" name="longitude" placeholder="<?= Lang::get('host_lng') ?>">
+                                <button type="submit" class="btn btn-success"><?= Lang::get('btn_add_host') ?></button>
                             </div>
                         </form>
 
-                        <div>
-                            <a href="?page=export_hosts_csv" class="btn btn-primary"
-                                style="display: inline-block;"><?= Lang::get('btn_export_csv') ?></a>
+                        <div style="margin-bottom: 1rem; margin-top: 1rem;">
+                            <input type="text" id="hostMgmtSearch" placeholder="Search hosts by name or IP..."
+                                class="search-input" style="width: 100%; max-width: 100%;">
+                        </div>
+                        <div class="hosts-list">
+                            <?php foreach (Host::getAll() as $h): ?>
+                                    <div class="host-item">
+                                        <div class="host-info" id="host_info_<?= $h['id'] ?>">
+                                            <span class="host-name">
+                                                <?= htmlspecialchars($h['name']) ?>
+                                                <?php if (isset($h['active']) && $h['active'] == '0')
+                                                    echo '<span class="text-muted" style="font-size: 0.8em; margin-left: 0.5rem;">(Disabled)</span>'; ?>
+                                            </span>
+                                            <span class="host-ip text-muted"><?= htmlspecialchars($h['ip']) ?></span>
+                                        </div>
+                                        <div class="host-edit-form" id="host_edit_<?= $h['id'] ?>"
+                                            style="display:none; flex:1; margin-right:1rem;">
+                                            <form method="POST" action="?page=settings" style="display:flex; gap:0.5rem; width:100%;">
+                                                <input type="hidden" name="action" value="edit_host">
+                                                <input type="hidden" name="id" value="<?= $h['id'] ?>">
+                                                <input type="text" name="name" value="<?= htmlspecialchars($h['name']) ?>" required
+                                                    style="flex:1;">
+                                                <input type="text" name="ip" value="<?= htmlspecialchars($h['ip']) ?>" required
+                                                    style="flex:1;">
+                                                <input type="text" name="latitude" value="<?= htmlspecialchars($h['latitude'] ?? '') ?>"
+                                                    placeholder="<?= Lang::get('host_lat') ?>" style="flex:1; max-width: 150px;">
+                                                <input type="text" name="longitude"
+                                                    value="<?= htmlspecialchars($h['longitude'] ?? '') ?>"
+                                                    placeholder="<?= Lang::get('host_lng') ?>" style="flex:1; max-width: 150px;">
+                                                <button type="submit"
+                                                    class="btn btn-success btn-sm"><?= Lang::get('btn_save') ?></button>
+                                                <button type="button" class="btn btn-danger btn-sm"
+                                                    onclick="toggleEdit(<?= $h['id'] ?>)"><?= Lang::get('btn_cancel') ?></button>
+                                            </form>
+                                        </div>
+                                        <div class="host-actions" id="host_actions_<?= $h['id'] ?>" style="display:flex; gap:0.5rem;">
+                                            <button type="button" class="btn btn-primary btn-sm"
+                                                onclick="toggleEdit(<?= $h['id'] ?>)"><?= Lang::get('btn_edit') ?></button>
+                                            <form method="POST" action="?page=settings">
+                                                <input type="hidden" name="action" value="toggle_active_host">
+                                                <input type="hidden" name="id" value="<?= $h['id'] ?>">
+                                                <input type="hidden" name="active"
+                                                    value="<?= isset($h['active']) && $h['active'] == '0' ? '1' : '0' ?>">
+                                                <button type="submit"
+                                                    class="btn <?= isset($h['active']) && $h['active'] == '0' ? 'btn-success' : 'btn-warning' ?> btn-sm">
+                                                    <?= isset($h['active']) && $h['active'] == '0' ? Lang::get('btn_enable') : Lang::get('btn_disable') ?>
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="?page=settings"
+                                                onsubmit="return confirm(window.i18n.js_confirm_delete_host)">
+                                                <input type="hidden" name="action" value="delete_host">
+                                                <input type="hidden" name="id" value="<?= $h['id'] ?>">
+                                                <button type="submit"
+                                                    class="btn btn-danger btn-sm"><?= Lang::get('btn_delete') ?></button>
+                                            </form>
+                                        </div>
+                                    </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <script>
+                        document.getElementById('hostMgmtSearch').addEventListener('input', function (e) {
+                            const term = e.target.value.toLowerCase();
+                            const items = document.querySelectorAll('.hosts-list .host-item');
+                            items.forEach(item => {
+                                const name = item.querySelector('.host-name').textContent.toLowerCase();
+                                const ip = item.querySelector('.host-ip').textContent.toLowerCase();
+                                if (name.includes(term) || ip.includes(term)) {
+                                    item.style.display = 'flex';
+                                } else {
+                                    item.style.display = 'none';
+                                }
+                            });
+                        });
+
+                        function toggleEdit(id) {
+                            const info = document.getElementById('host_info_' + id);
+                            const edit = document.getElementById('host_edit_' + id);
+                            const actions = document.getElementById('host_actions_' + id);
+
+                            if (info.style.display === 'none') {
+                                info.style.display = 'flex';
+                                actions.style.display = 'flex';
+                                edit.style.display = 'none';
+                            } else {
+                                info.style.display = 'none';
+                                actions.style.display = 'none';
+                                edit.style.display = 'flex';
+                            }
+                        }
+                    </script>
+
+                    <!-- Import/Export Hosts -->
+                    <div class="settings-card" style="margin-top: 2rem;">
+                        <h3 style="margin-top:0;"><?= Lang::get('host_import_title') ?></h3>
+                        <p class="text-muted mb-3"><?= Lang::get('host_import_format') ?></p>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <form method="POST" action="?page=settings" enctype="multipart/form-data">
+                                <input type="hidden" name="action" value="import_csv">
+                                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                    <input type="file" name="csv_file" accept=".csv" required class="file-input"
+                                        style="flex: 1; min-width: 200px;">
+                                    <button type="submit" class="btn btn-primary"><?= Lang::get('btn_import_csv') ?></button>
+                                </div>
+                            </form>
+
+                            <div>
+                                <a href="?page=export_hosts_csv" class="btn btn-primary"
+                                    style="display: inline-block;"><?= Lang::get('btn_export_csv') ?></a>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div id="userMgmt" class="tab-content">
-                <!-- User Management -->
-                <div class="settings-card">
-                    <h3><?= Lang::get('tab_user_mgmt') ?></h3>
+                <div id="userMgmt" class="tab-content">
+                    <!-- User Management -->
+                    <div class="settings-card">
+                        <h3><?= Lang::get('tab_user_mgmt') ?></h3>
 
-                    <h4 style="margin-top:0;"><?= Lang::get('user_change_password') ?></h4>
-                    <form method="POST" action="?page=settings">
-                        <input type="hidden" name="action" value="change_password">
-                        <div class="form-group">
-                            <input type="password" name="current_password"
-                                placeholder="<?= Lang::get('user_current_password') ?>" required>
-                        </div>
-                        <div class="form-group">
-                            <input type="password" name="new_password" placeholder="<?= Lang::get('user_new_password') ?>"
-                                required>
-                        </div>
-                        <button type="submit"
-                            class="btn btn-primary btn-sm"><?= Lang::get('btn_update_password') ?></button>
-                    </form>
-
-                    <?php if (Auth::isAdmin()): ?>
-                        <div class="divider"></div>
-                        <h4><?= Lang::get('user_add_new') ?></h4>
+                        <h4 style="margin-top:0;"><?= Lang::get('user_change_password') ?></h4>
                         <form method="POST" action="?page=settings">
-                            <input type="hidden" name="action" value="add_user">
-                            <div class="input-group">
-                                <input type="text" name="new_username" placeholder="<?= Lang::get('user_username') ?>" required>
-                                <input type="password" name="new_password" placeholder="<?= Lang::get('user_password') ?>"
-                                    required>
-                                <select name="role" class="form-select" required>
-                                    <option value="user"><?= Lang::get('role_user') ?></option>
-                                    <option value="admin"><?= Lang::get('role_admin') ?></option>
-                                </select>
-                                <button type="submit" class="btn btn-success"><?= Lang::get('btn_add_user') ?></button>
+                            <input type="hidden" name="action" value="change_password">
+                            <div class="form-group">
+                                <input type="password" name="current_password"
+                                    placeholder="<?= Lang::get('user_current_password') ?>" required>
                             </div>
+                            <div class="form-group">
+                                <input type="password" name="new_password" placeholder="<?= Lang::get('user_new_password') ?>"
+                                    required>
+                            </div>
+                            <button type="submit"
+                                class="btn btn-primary btn-sm"><?= Lang::get('btn_update_password') ?></button>
                         </form>
 
-                        <h4 style="margin-bottom: 0.5rem;"><?= Lang::get('user_existing') ?></h4>
-                        <div class="hosts-list" style="max-height: 200px;">
-                            <?php foreach (Auth::getAllUsers() as $u): ?>
-                                <div class="host-item" style="padding: 0.5rem 1rem;">
-                                    <span><?= htmlspecialchars($u['username']) ?> <small
-                                            class="text-muted">(<?= htmlspecialchars($u['role'] === 'admin' ? Lang::get('role_admin') : Lang::get('role_user')) ?>)</small></span>
-                                    <?php if ($u['id'] !== $_SESSION['user_id']): ?>
-                                        <form method="POST" action="?page=settings"
-                                            onsubmit="return confirm(window.i18n.js_confirm_delete_user)">
-                                            <input type="hidden" name="action" value="delete_user">
-                                            <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                                            <button type="submit" class="btn btn-danger btn-sm"><?= Lang::get('btn_delete') ?></button>
-                                        </form>
-                                    <?php endif; ?>
+                        <?php if (Auth::isAdmin()): ?>
+                                <div class="divider"></div>
+                                <h4><?= Lang::get('user_add_new') ?></h4>
+                                <form method="POST" action="?page=settings">
+                                    <input type="hidden" name="action" value="add_user">
+                                    <div class="input-group">
+                                        <input type="text" name="new_username" placeholder="<?= Lang::get('user_username') ?>" required>
+                                        <input type="password" name="new_password" placeholder="<?= Lang::get('user_password') ?>"
+                                            required>
+                                        <select name="role" class="form-select" required>
+                                            <option value="user"><?= Lang::get('role_user') ?></option>
+                                            <option value="admin"><?= Lang::get('role_admin') ?></option>
+                                        </select>
+                                        <button type="submit" class="btn btn-success"><?= Lang::get('btn_add_user') ?></button>
+                                    </div>
+                                </form>
+
+                                <h4 style="margin-bottom: 0.5rem;"><?= Lang::get('user_existing') ?></h4>
+                                <div class="hosts-list" style="max-height: 200px;">
+                                    <?php foreach (Auth::getAllUsers() as $u): ?>
+                                            <div class="host-item" style="padding: 0.5rem 1rem;">
+                                                <span><?= htmlspecialchars($u['username']) ?> <small
+                                                        class="text-muted">(<?= htmlspecialchars($u['role'] === 'admin' ? Lang::get('role_admin') : Lang::get('role_user')) ?>)</small></span>
+                                                <?php if ($u['id'] !== $_SESSION['user_id']): ?>
+                                                        <form method="POST" action="?page=settings"
+                                                            onsubmit="return confirm(window.i18n.js_confirm_delete_user)">
+                                                            <input type="hidden" name="action" value="delete_user">
+                                                            <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
+                                                            <button type="submit" class="btn btn-danger btn-sm"><?= Lang::get('btn_delete') ?></button>
+                                                        </form>
+                                                <?php endif; ?>
+                                            </div>
+                                    <?php endforeach; ?>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            </div>
-            </div>
+                </div>
 
-            <script>
-                function openTab(evt, tabName) {
-                    var i, tabcontent, tablinks;
-                    tabcontent = document.getElementsByClassName("tab-content");
-                    for (i = 0; i < tabcontent.length; i++) {
-                        tabcontent[i].classList.remove("active");
-                    }
-                    tablinks = document.getElementsByClassName("tab-button");
-                    for (i = 0; i < tablinks.length; i++) {
-                        tablinks[i].classList.remove("active");
-                    }
-                    document.getElementById(tabName).classList.add("active");
+                <script>
+                    function openTab(evt, tabName) {
+                        var i, tabcontent, tablinks;
+                        tabcontent = document.getElementsByClassName("tab-content");
+                        for (i = 0; i < tabcontent.length; i++) {
+                            tabcontent[i].classList.remove("active");
+                        }
+                        tablinks = document.getElementsByClassName("tab-button");
+                        for (i = 0; i < tablinks.length; i++) {
+                            tablinks[i].classList.remove("active");
+                        }
+                        document.getElementById(tabName).classList.add("active");
 
-                    if (evt) {
-                        evt.currentTarget.classList.add("active");
-                    } else {
-                        // find matching button
-                        const btns = document.getElementsByClassName("tab-button");
-                        for (let b of btns) {
-                            if (b.getAttribute('onclick').includes(tabName)) {
-                                b.classList.add("active");
+                        if (evt) {
+                            evt.currentTarget.classList.add("active");
+                        } else {
+                            // find matching button
+                            const btns = document.getElementsByClassName("tab-button");
+                            for (let b of btns) {
+                                if (b.getAttribute('onclick').includes(tabName)) {
+                                    b.classList.add("active");
+                                }
                             }
                         }
+
+                        sessionStorage.setItem('activeSettingsTab', tabName);
                     }
 
-                    sessionStorage.setItem('activeSettingsTab', tabName);
-                }
-
-                document.addEventListener('DOMContentLoaded', () => {
-                    const activeTab = sessionStorage.getItem('activeSettingsTab');
-                    if (activeTab) {
-                        openTab(null, activeTab);
-                    }
-                });
-            </script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const activeTab = sessionStorage.getItem('activeSettingsTab');
+                        if (activeTab) {
+                            openTab(null, activeTab);
+                        }
+                    });
+                </script>
         <?php elseif ($page === 'history'): ?>
-            <div class="dashboard-header">
-                <h2 id="globalHistoryTitle"><?= Lang::get('history_title') ?></h2>
-                <div class="dashboard-controls" style="display: flex; gap: 1rem; align-items: center;">
-                    <button id="toggleArchiveBtn" class="btn btn-primary"
-                        style="white-space: nowrap;"><?= Lang::get('btn_old_downtimes') ?></button>
-                    <input type="text" id="historySearch"
-                        placeholder="<?= Lang::get('search_history_placeholder') ?? 'Search by name, IP or date...' ?>"
-                        class="search-input" style="width: 300px;">
+                <div class="dashboard-header">
+                    <h2 id="globalHistoryTitle"><?= Lang::get('history_title') ?></h2>
+                    <div class="dashboard-controls" style="display: flex; gap: 1rem; align-items: center;">
+                        <button id="toggleArchiveBtn" class="btn btn-primary"
+                            style="white-space: nowrap;"><?= Lang::get('btn_old_downtimes') ?></button>
+                        <input type="text" id="historySearch"
+                            placeholder="<?= Lang::get('search_history_placeholder') ?? 'Search by name, IP or date...' ?>"
+                            class="search-input" style="width: 300px;">
+                    </div>
                 </div>
-            </div>
-            <div class="history-table-container">
-                <table class="history-table" id="globalHistoryTable">
-                    <thead>
-                        <tr>
-                            <th style="cursor:pointer; user-select:none;" data-sort="date">
-                                <?= Lang::get('date_time_from') ?> ↕</th>
-                            <th><?= Lang::get('date_time_to') ?></th>
-                            <th><?= Lang::get('duration') ?></th>
-                            <th style="cursor:pointer; user-select:none;" data-sort="name"><?= Lang::get('host_name') ?> ↕
-                            </th>
-                            <th style="cursor:pointer; user-select:none;" data-sort="ip"><?= Lang::get('host_ip') ?> ↕</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="5" class="text-muted text-center"><?= Lang::get('loading') ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div id="globalHistoryPagination"
-                    style="margin-top: 1rem; display: flex; justify-content: center; gap: 0.5rem; align-items: center;">
+                <div class="history-table-container">
+                    <table class="history-table" id="globalHistoryTable">
+                        <thead>
+                            <tr>
+                                <th style="cursor:pointer; user-select:none;" data-sort="date">
+                                    <?= Lang::get('date_time_from') ?> ↕</th>
+                                <th><?= Lang::get('date_time_to') ?></th>
+                                <th><?= Lang::get('duration') ?></th>
+                                <th style="cursor:pointer; user-select:none;" data-sort="name"><?= Lang::get('host_name') ?> ↕
+                                </th>
+                                <th style="cursor:pointer; user-select:none;" data-sort="ip"><?= Lang::get('host_ip') ?> ↕</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="text-muted text-center"><?= Lang::get('loading') ?></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div id="globalHistoryPagination"
+                        style="margin-top: 1rem; display: flex; justify-content: center; gap: 0.5rem; align-items: center;">
+                    </div>
                 </div>
-            </div>
-            <script src="js/history.js?v=1.0"></script>
+                <script src="js/history.js?v=1.0"></script>
         <?php else: ?>
-            <div class="empty-state">
-                <h2>404 - Page not found</h2>
-                <a href="?page=dashboard" class="btn btn-primary">Go to Dashboard</a>
-            </div>
+                <div class="empty-state">
+                    <h2>404 - Page not found</h2>
+                    <a href="?page=dashboard" class="btn btn-primary">Go to Dashboard</a>
+                </div>
         <?php endif; ?>
     </main>
 
     <?php if ($page === 'dashboard'): ?>
-        <script src="js/dashboard.js?v=1.3"></script>
+            <script src="js/dashboard.js?v=1.3"></script>
     <?php endif; ?>
     <div
         style="position: fixed; bottom: 5px; right: 10px; font-size: 0.7rem; color: rgba(255,255,255,0.3); pointer-events: none; z-index: 9999;">

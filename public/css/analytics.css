@@ -129,9 +129,19 @@
     flex-shrink: 0 !important;
 }
 
+.analytics-charts-grid .analytics-card {
+    height: 275px !important;
+    min-height: 275px !important;
+}
+
 @media (max-width: 900px) {
     .analytics-charts-grid {
         grid-template-columns: 1fr !important;
+    }
+
+    .analytics-charts-grid .analytics-card {
+        height: 280px !important;
+        min-height: 280px !important;
     }
 
     #publicAnalyticsView {
@@ -199,8 +209,111 @@
 
 .analytics-chart-wrap {
     position: relative !important;
-    height: 170px !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
     width: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Top 10 Offline Hosts - Native DOM Chart */
+.top-offline-native-list {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    height: 100% !important;
+    width: 100% !important;
+    gap: 2px !important;
+    padding: 2px 0 !important;
+}
+
+.top-host-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.55rem !important;
+    padding: 2px 6px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    transition: background 0.15s ease, transform 0.1s ease !important;
+}
+
+.top-host-row:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.top-host-rank {
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    width: 22px !important;
+    text-align: center !important;
+    flex-shrink: 0 !important;
+}
+
+.top-host-row:nth-child(1) .top-host-rank {
+    color: #f43f5e !important;
+}
+
+.top-host-row:nth-child(2) .top-host-rank {
+    color: #fb7185 !important;
+}
+
+.top-host-row:nth-child(3) .top-host-rank {
+    color: #fda4af !important;
+}
+
+.top-host-name {
+    font-size: 0.92rem !important;
+    font-weight: 600 !important;
+    color: #f1f5f9 !important;
+    flex: 0 1 44% !important;
+    min-width: 90px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.top-host-bar-track {
+    flex: 1 1 auto !important;
+    height: 8px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-radius: 9999px !important;
+    overflow: hidden !important;
+    min-width: 45px !important;
+    position: relative !important;
+}
+
+.top-host-bar-fill {
+    height: 100% !important;
+    border-radius: 9999px !important;
+    background: linear-gradient(90deg, #f43f5e, #fb7185) !important;
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.45) !important;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.top-host-value {
+    font-size: 0.90rem !important;
+    font-weight: 700 !important;
+    color: #fda4af !important;
+    min-width: 32px !important;
+    text-align: right !important;
+    flex-shrink: 0 !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+.top-offline-empty {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.45rem !important;
+    color: #94a3b8 !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    text-align: center !important;
 }
 
 /* Status Badges Row below Doughnut Chart */

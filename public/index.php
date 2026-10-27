@@ -3,7 +3,7 @@
  * INSTRUÇÃO: Sempre atualize a constante APP_VERSION (versões e subversões) 
  * sempre que realizar alterações futuras no código do sistema!
  */
-define('APP_VERSION', '0.13.6');
+define('APP_VERSION', '0.13.7');
 
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/Auth.php';
@@ -948,8 +948,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                                     </div>
                                 </div>
                             </div>
-                            <div class="analytics-chart-wrap">
-                                <canvas id="topOfflineBarChart"></canvas>
+                            <div class="analytics-chart-wrap" id="topOfflineChartWrap">
+                                <div id="topOfflineNativeList" class="top-offline-native-list"></div>
                             </div>
                         </div>
 

@@ -622,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
             statusPieChartInstance.data.labels = chartLabels;
             statusPieChartInstance.data.datasets[0].data = chartData;
             statusPieChartInstance.update('none');
+            statusPieChartInstance.resize();
         } else {
             statusPieChartInstance = new Chart(ctx, {
                 type: 'doughnut',
@@ -664,81 +665,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTopOfflineBarChart(topHosts) {
-        const ctx = document.getElementById('topOfflineBarChart');
-        if (!ctx) return;
+        let container = document.getElementById('topOfflineNativeList');
+        if (!container) {
+            const el = document.getElementById('topOfflineBarChart');
+            if (el) {
+                if (el.tagName && el.tagName.toLowerCase() === 'canvas') {
+                    const div = document.createElement('div');
+                    div.id = 'topOfflineNativeList';
+                    div.className = 'top-offline-native-list';
+                    el.parentNode.replaceChild(div, el);
+                    container = div;
+                } else {
+                    container = el;
+                }
+            }
+        }
+        if (!container) return;
 
         const hostsList = Array.isArray(topHosts) ? topHosts : [];
-        const labels = hostsList.map(h => h.name);
-        const values = hostsList.map(h => h.offline_count);
-
-        if (topOfflineBarChartInstance) {
-            topOfflineBarChartInstance.data.labels = labels;
-            topOfflineBarChartInstance.data.datasets[0].data = values;
-            topOfflineBarChartInstance.options.scales.y.ticks.autoSkip = false;
-            topOfflineBarChartInstance.update('none');
-        } else {
-            topOfflineBarChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: window.i18n.chart_top10_subtitle || 'Alertas registrados',
-                        data: values,
-                        backgroundColor: '#f43f5e',
-                        borderRadius: 3,
-                        borderSkipped: false,
-                        barThickness: 6,
-                        maxBarThickness: 7
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#1e293b',
-                            titleColor: '#f8fafc',
-                            bodyColor: '#cbd5e1',
-                            borderColor: '#334155',
-                            borderWidth: 1,
-                            padding: 10,
-                            callbacks: {
-                                title: items => items[0].label,
-                                label: context => ` ${window.i18n.chart_top10_subtitle || 'Alertas offline'}: ${context.raw}`
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            ticks: {
-                                precision: 0,
-                                color: '#94a3b8',
-                                font: { family: 'Inter', size: 10 }
-                            },
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.05)'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                autoSkip: false,
-                                color: '#cbd5e1',
-                                font: { family: 'Inter', size: 9 },
-                                padding: 2,
-                                callback: function (val) {
-                                    const label = this.getLabelForValue(val) || '';
-                                    return label.length > 20 ? label.substring(0, 18) + '…' : label;
-                                }
-                            },
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
+        if (hostsList.length === 0) {
+            container.innerHTML = `
+                <div class="top-offline-empty">
+                    <span style="font-size: 1.6rem; opacity: 0.85;">🎉</span>
+                    <span>${window.i18n.table_no_offline || 'Nenhuma queda nos últimos 7 dias'}</span>
+                </div>`;
+            return;
         }
+
+        const maxVal = Math.max(...hostsList.map(h => Number(h.offline_count) || 0), 1);
+
+        let html = '';
+        hostsList.slice(0, 10).forEach((h, idx) => {
+            const count = Number(h.offline_count) || 0;
+            const pct = Math.max(6, Math.min(100, Math.round((count / maxVal) * 100)));
+            const safeName = escapeHtml(h.name || 'Host');
+            const safeId = parseInt(h.id, 10) || 0;
+            const subtitleText = window.i18n.chart_top10_subtitle || 'Alertas offline';
+
+            html += `
+                <div class="top-host-row" onclick="openHostModalFromEvent(${safeId}, '${encodeURIComponent(h.name || '')}')" title="${safeName}: ${count} ${subtitleText}">
+                    <span class="top-host-rank">${idx + 1}</span>
+                    <span class="top-host-name" title="${safeName}">${safeName}</span>
+                    <div class="top-host-bar-track">
+                        <div class="top-host-bar-fill" style="width: ${pct}%;"></div>
+                    </div>
+                    <span class="top-host-value">${count}</span>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
     }
 
     function renderHistoryLineChart(history) {
@@ -755,6 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
             historyLineChartInstance.data.datasets[0].data = onlineVals;
             historyLineChartInstance.data.datasets[1].data = offlineVals;
             historyLineChartInstance.update('none');
+            historyLineChartInstance.resize();
         } else {
             historyLineChartInstance = new Chart(ctx, {
                 type: 'line',
@@ -765,7 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             label: window.i18n.chart_legend_online || 'Hosts Online',
                             data: onlineVals,
                             borderColor: '#10b981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
                             borderWidth: 2.2,
                             tension: 0.3,
                             fill: true,
@@ -776,7 +753,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             label: window.i18n.chart_legend_offline || 'Hosts com Queda',
                             data: offlineVals,
                             borderColor: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
                             borderWidth: 2.2,
                             tension: 0.3,
                             fill: true,
@@ -788,6 +765,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            top: 4,
+                            bottom: 2,
+                            left: 0,
+                            right: 4
+                        }
+                    },
                     interaction: {
                         mode: 'index',
                         intersect: false
@@ -797,8 +782,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             position: 'top',
                             labels: {
                                 color: '#cbd5e1',
-                                font: { family: 'Inter', size: 11 },
+                                font: { family: 'Inter', size: 11.5 },
                                 boxWidth: 10,
+                                padding: 6,
                                 usePointStyle: true
                             }
                         },
@@ -823,7 +809,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 color: '#94a3b8',
                                 font: { family: 'Inter', size: 11 },
                                 maxRotation: 0,
-                                autoSkip: false
+                                autoSkip: false,
+                                padding: 2
                             },
                             grid: {
                                 color: 'rgba(255, 255, 255, 0.04)'
@@ -834,7 +821,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             ticks: {
                                 color: '#94a3b8',
                                 font: { family: 'Inter', size: 11 },
-                                precision: 0
+                                precision: 0,
+                                padding: 3
                             },
                             grid: {
                                 color: 'rgba(255, 255, 255, 0.05)'

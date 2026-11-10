@@ -1,10 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
     const publicGrid = document.getElementById('publicGrid');
     const sortSelect = document.getElementById('sortSelect');
+    const mobileSortSelect = document.getElementById('mobileSortSelect');
     const enableAudioBtn = document.getElementById('enableAudioBtn');
+    const mobileEnableAudioBtn = document.getElementById('mobileEnableAudioBtn');
     const clock = document.getElementById('clock');
+    const mobileClock = document.getElementById('mobileClock');
 
     const tvModeBtn = document.getElementById('tvModeBtn');
+    const mobileTvModeBtn = document.getElementById('mobileTvModeBtn');
+
+    // Version Selection & Mobile Menu Elements
+    const versionSelectModal = document.getElementById('versionSelectModal');
+    const btnChooseMobile = document.getElementById('btnChooseMobile');
+    const btnChooseDesktop = document.getElementById('btnChooseDesktop');
+    const openVersionModalBtn = document.getElementById('openVersionModalBtn');
+    const menuBtnVersionMobile = document.getElementById('menuBtnVersionMobile');
+    const menuBtnVersionDesktop = document.getElementById('menuBtnVersionDesktop');
+
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+    const closeMobileMenuBtn = document.getElementById('closeMobileMenuBtn');
 
     let hostsData = [];
     let audioEnabled = localStorage.getItem('audioEnabled') === 'true';
@@ -12,24 +28,124 @@ document.addEventListener('DOMContentLoaded', () => {
     let previousOfflineIds = new Set();
     let isFirstLoad = true;
 
-    if (audioEnabled) {
-        enableAudioBtn.style.display = 'none';
+    function isMobileMode() {
+        return document.body.classList.contains('public-mobile-mode');
     }
 
-    function updateTvModeBtn() {
-        if (tvModeBtn) {
-            tvModeBtn.textContent = (window.i18n.tv_view || 'TV Mode') + ': ' + (tvModeEnabled ? 'ON' : 'OFF');
+    function updateVersionButtonsUI(mode) {
+        if (menuBtnVersionMobile) menuBtnVersionMobile.classList.toggle('active', mode === 'mobile');
+        if (menuBtnVersionDesktop) menuBtnVersionDesktop.classList.toggle('active', mode === 'desktop');
+        if (btnChooseMobile) btnChooseMobile.classList.toggle('active-choice', mode === 'mobile');
+        if (btnChooseDesktop) btnChooseDesktop.classList.toggle('active-choice', mode === 'desktop');
+    }
+
+    function applyViewMode(mode, save = true) {
+        if (save) {
+            localStorage.setItem('public_view_mode', mode);
         }
+        document.body.classList.toggle('public-mobile-mode', mode === 'mobile');
+        updateVersionButtonsUI(mode);
+
+        if (versionSelectModal) {
+            versionSelectModal.classList.remove('show');
+        }
+        if (mobileMenuOverlay) {
+            mobileMenuOverlay.classList.remove('open');
+        }
+
+        if (hostsData.length > 0) {
+            filterAndRender();
+        }
+        setTimeout(() => {
+            if (statusPieChartInstance) statusPieChartInstance.resize();
+            if (historyLineChartInstance) historyLineChartInstance.resize();
+        }, 60);
+    }
+
+    // Check saved version preference or open modal on first visit
+    const savedViewMode = localStorage.getItem('public_view_mode');
+    if (savedViewMode === 'mobile' || savedViewMode === 'desktop') {
+        applyViewMode(savedViewMode, false);
+    } else if (versionSelectModal) {
+        setTimeout(() => {
+            versionSelectModal.classList.add('show');
+        }, 50);
+    }
+
+    if (btnChooseMobile) {
+        btnChooseMobile.addEventListener('click', () => applyViewMode('mobile', true));
+    }
+    if (btnChooseDesktop) {
+        btnChooseDesktop.addEventListener('click', () => applyViewMode('desktop', true));
+    }
+    if (menuBtnVersionMobile) {
+        menuBtnVersionMobile.addEventListener('click', () => applyViewMode('mobile', true));
+    }
+    if (menuBtnVersionDesktop) {
+        menuBtnVersionDesktop.addEventListener('click', () => applyViewMode('desktop', true));
+    }
+    if (openVersionModalBtn && versionSelectModal) {
+        openVersionModalBtn.addEventListener('click', () => {
+            const currentMode = localStorage.getItem('public_view_mode') || 'desktop';
+            updateVersionButtonsUI(currentMode);
+            versionSelectModal.classList.add('show');
+        });
+    }
+    if (versionSelectModal) {
+        versionSelectModal.addEventListener('click', (e) => {
+            // Allow closing by clicking backdrop only if a version was already selected previously
+            if (e.target === versionSelectModal && localStorage.getItem('public_view_mode')) {
+                versionSelectModal.classList.remove('show');
+            }
+        });
+    }
+
+    // Mobile Hamburger Menu Drawer Handlers
+    if (mobileMenuBtn && mobileMenuOverlay) {
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenuOverlay.classList.add('open');
+        });
+    }
+    if (closeMobileMenuBtn && mobileMenuOverlay) {
+        closeMobileMenuBtn.addEventListener('click', () => {
+            mobileMenuOverlay.classList.remove('open');
+        });
+    }
+    if (mobileMenuOverlay) {
+        mobileMenuOverlay.addEventListener('click', (e) => {
+            if (e.target === mobileMenuOverlay) {
+                mobileMenuOverlay.classList.remove('open');
+            }
+        });
+    }
+
+    function updateAudioBtns() {
+        if (audioEnabled) {
+            if (enableAudioBtn) enableAudioBtn.style.display = 'none';
+            if (mobileEnableAudioBtn) mobileEnableAudioBtn.style.display = 'none';
+        }
+    }
+    updateAudioBtns();
+
+    function updateTvModeBtn() {
+        const label = (window.i18n.tv_view || 'TV Mode') + ': ' + (tvModeEnabled ? 'ON' : 'OFF');
+        if (tvModeBtn) tvModeBtn.textContent = label;
+        if (mobileTvModeBtn) mobileTvModeBtn.textContent = label;
     }
     updateTvModeBtn();
 
+    function toggleTvMode() {
+        tvModeEnabled = !tvModeEnabled;
+        localStorage.setItem('tvModeEnabled', tvModeEnabled ? 'true' : 'false');
+        updateTvModeBtn();
+        filterAndRender();
+    }
+
     if (tvModeBtn) {
-        tvModeBtn.addEventListener('click', () => {
-            tvModeEnabled = !tvModeEnabled;
-            localStorage.setItem('tvModeEnabled', tvModeEnabled ? 'true' : 'false');
-            updateTvModeBtn();
-            filterAndRender();
-        });
+        tvModeBtn.addEventListener('click', toggleTvMode);
+    }
+    if (mobileTvModeBtn) {
+        mobileTvModeBtn.addEventListener('click', toggleTvMode);
     }
 
     function playBeep(type = 'normal') {
@@ -94,12 +210,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    enableAudioBtn.addEventListener('click', () => {
+    function activateAudio() {
         audioEnabled = true;
         localStorage.setItem('audioEnabled', 'true');
-        enableAudioBtn.style.display = 'none';
+        updateAudioBtns();
         playBeep(); // test beep to unlock audio context
-    });
+    }
+
+    if (enableAudioBtn) {
+        enableAudioBtn.addEventListener('click', activateAudio);
+    }
+    if (mobileEnableAudioBtn) {
+        mobileEnableAudioBtn.addEventListener('click', activateAudio);
+    }
 
     function escapeHtml(unsafe) {
         return (unsafe || '').toString()
@@ -112,7 +235,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateClock() {
         const now = new Date();
-        clock.textContent = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+        const str = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+        if (clock) clock.textContent = str;
+        if (mobileClock) mobileClock.textContent = str;
     }
     setInterval(updateClock, 1000);
     updateClock();
@@ -233,8 +358,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const isPortrait = window.innerWidth < window.innerHeight;
+            const mobileMode = isMobileMode();
 
-            if (tvModeEnabled) {
+            if (mobileMode) {
+                card.style.containerType = 'normal';
+                card.style.setProperty('--mobile-icon-size', tvModeEnabled ? '1.25rem' : '1.6rem');
+                card.style.setProperty('--mobile-title-size', tvModeEnabled ? '0.74rem' : '0.86rem');
+                card.innerHTML = `
+                    <div class="public-card-icon" style="line-height: 1;">${icon}</div>
+                    <div class="host-card-title public-card-title" style="text-align: center; word-break: break-word; padding: 0 0.25rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(host.name)}</div>
+                `;
+            } else if (tvModeEnabled) {
                 const textFontSize = isPortrait ? '16cqmin' : '10cqmin';
                 const iconFontSize = isPortrait ? '30cqmin' : '25cqmin';
                 card.innerHTML = `
@@ -265,6 +399,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateGridLayout(count) {
         const grid = document.getElementById('publicGrid');
         if (!grid || count === 0) return;
+
+        if (isMobileMode()) {
+            grid.style.gridTemplateRows = 'none';
+            if (tvModeEnabled) {
+                const cols = count > 24 ? 4 : 3;
+                grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+                grid.style.gridAutoRows = cols === 4 ? '76px' : '84px';
+            } else {
+                grid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+                grid.style.gridAutoRows = '94px';
+            }
+            return;
+        }
 
         const W = grid.clientWidth;
         const H = grid.clientHeight;
@@ -518,9 +665,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===================================================
     const tabBtnDashboard = document.getElementById('tabBtnDashboard');
     const tabBtnAnalytics = document.getElementById('tabBtnAnalytics');
+    const mobileTabBtnDashboard = document.getElementById('mobileTabBtnDashboard');
+    const mobileTabBtnAnalytics = document.getElementById('mobileTabBtnAnalytics');
     const publicDashboardView = document.getElementById('publicDashboardView');
     const publicAnalyticsView = document.getElementById('publicAnalyticsView');
     const dashboardControls = document.getElementById('dashboardControls');
+    const mobileDashboardControlsGroup = document.getElementById('mobileDashboardControlsGroup');
 
     let activeTab = localStorage.getItem('public_active_tab') || 'dashboard';
     let analyticsData = null;
@@ -550,21 +700,31 @@ document.addEventListener('DOMContentLoaded', () => {
         activeTab = tabName;
         localStorage.setItem('public_active_tab', tabName);
 
+        if (mobileMenuOverlay) {
+            mobileMenuOverlay.classList.remove('open');
+        }
+
         if (tabName === 'dashboard') {
             if (tabBtnDashboard) tabBtnDashboard.classList.add('active');
             if (tabBtnAnalytics) tabBtnAnalytics.classList.remove('active');
+            if (mobileTabBtnDashboard) mobileTabBtnDashboard.classList.add('active');
+            if (mobileTabBtnAnalytics) mobileTabBtnAnalytics.classList.remove('active');
             if (publicDashboardView) publicDashboardView.style.display = 'block';
             if (publicAnalyticsView) publicAnalyticsView.style.display = 'none';
             if (dashboardControls) dashboardControls.style.display = 'flex';
+            if (mobileDashboardControlsGroup) mobileDashboardControlsGroup.style.display = 'flex';
             if (hostsData.length > 0) {
                 filterAndRender();
             }
         } else {
             if (tabBtnDashboard) tabBtnDashboard.classList.remove('active');
             if (tabBtnAnalytics) tabBtnAnalytics.classList.add('active');
+            if (mobileTabBtnDashboard) mobileTabBtnDashboard.classList.remove('active');
+            if (mobileTabBtnAnalytics) mobileTabBtnAnalytics.classList.add('active');
             if (publicDashboardView) publicDashboardView.style.display = 'none';
             if (publicAnalyticsView) publicAnalyticsView.style.display = 'flex';
             if (dashboardControls) dashboardControls.style.display = 'none';
+            if (mobileDashboardControlsGroup) mobileDashboardControlsGroup.style.display = 'none';
             fetchAnalytics();
         }
     }
@@ -572,12 +732,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabBtnDashboard && tabBtnAnalytics) {
         tabBtnDashboard.addEventListener('click', () => switchTab('dashboard'));
         tabBtnAnalytics.addEventListener('click', () => switchTab('analytics'));
+    }
+    if (mobileTabBtnDashboard && mobileTabBtnAnalytics) {
+        mobileTabBtnDashboard.addEventListener('click', () => switchTab('dashboard'));
+        mobileTabBtnAnalytics.addEventListener('click', () => switchTab('analytics'));
+    }
 
-        if (window.location.hash === '#analytics' || activeTab === 'analytics') {
-            switchTab('analytics');
-        } else {
-            switchTab('dashboard');
-        }
+    if (window.location.hash === '#analytics' || activeTab === 'analytics') {
+        switchTab('analytics');
+    } else {
+        switchTab('dashboard');
     }
 
     function renderAnalytics(data) {
@@ -989,7 +1153,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 15000);
 
-    sortSelect.addEventListener('change', filterAndRender);
+    if (sortSelect) {
+        sortSelect.addEventListener('change', () => {
+            if (mobileSortSelect) mobileSortSelect.value = sortSelect.value;
+            filterAndRender();
+        });
+    }
+    if (mobileSortSelect) {
+        mobileSortSelect.addEventListener('change', () => {
+            if (sortSelect) sortSelect.value = mobileSortSelect.value;
+            filterAndRender();
+        });
+    }
 
     fetchHosts();
     setInterval(fetchHosts, 5000);

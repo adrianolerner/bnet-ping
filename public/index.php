@@ -3,7 +3,7 @@
  * INSTRUÇÃO: Sempre atualize a constante APP_VERSION (versões e subversões) 
  * sempre que realizar alterações futuras no código do sistema!
  */
-define('APP_VERSION', '0.14.0');
+define('APP_VERSION', '0.14.1');
 
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/Auth.php';
@@ -1611,7 +1611,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                     </form>
 
                     <div style="margin-bottom: 1rem; margin-top: 1rem;">
-                        <input type="text" id="hostMgmtSearch" placeholder="Search hosts by name or IP..."
+                        <input type="text" id="hostMgmtSearch" placeholder="<?= Lang::get('host_search_placeholder') ?>"
                             class="search-input" style="width: 100%; max-width: 100%;">
                     </div>
                     <div class="hosts-list">
@@ -1621,7 +1621,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                                     <span class="host-name">
                                         <?= htmlspecialchars($h['name']) ?>
                                         <?php if (isset($h['active']) && $h['active'] == '0')
-                                            echo '<span class="text-muted" style="font-size: 0.8em; margin-left: 0.5rem;">(Disabled)</span>'; ?>
+                                            echo '<span class="text-muted" style="font-size: 0.8em; margin-left: 0.5rem;">(' . Lang::get('host_disabled') . ')</span>'; ?>
                                     </span>
                                     <span class="host-ip text-muted"><?= htmlspecialchars($h['ip']) ?></span>
                                 </div>

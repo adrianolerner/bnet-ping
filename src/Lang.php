@@ -1,7 +1,8 @@
 <?php
 namespace PingApp;
 
-class Lang {
+class Lang
+{
     private static $translations = [
         'en' => [
             // General
@@ -18,7 +19,7 @@ class Lang {
             'unknown' => 'UNKNOWN',
             'now' => 'NOW',
             'duration' => 'Duration',
-            
+
             // Menu
             'nav_dashboard' => 'Dashboard',
             'nav_map' => 'Map',
@@ -26,14 +27,14 @@ class Lang {
             'nav_reports' => 'Reports',
             'nav_settings' => 'Settings',
             'nav_logout' => 'Logout',
-            
+
             // Login
             'login_welcome' => 'Welcome Back',
             'login_subtitle' => 'Sign in to BNET Monitor',
             'login_username' => 'Username',
             'login_password' => 'Password',
             'login_btn' => 'Sign In',
-            
+
             // Dashboard
             'dash_overview' => 'Status Overview',
             'sort_name' => 'Sort by Name',
@@ -89,13 +90,13 @@ class Lang {
             'menu_section_version' => 'Interface Version',
             'menu_section_lang' => 'Language',
             'audio_enabled_status' => 'Audio Enabled',
-            
+
             // Host Details & Charts
             'period_1h' => '1 Hour',
             'period_24h' => '24 Hours',
             'period_1w' => '1 Week',
             'period_1m' => '1 Month',
-            
+
             // History Tab
             'history_title' => 'Global Downtime History',
             'history_archived_title' => 'Archived Downtimes (> 30 days)',
@@ -106,7 +107,7 @@ class Lang {
             'search_history_placeholder' => 'Search by name, IP or date...',
             'date_time_from' => 'Date & Time (From)',
             'date_time_to' => 'Date & Time (To)',
-            
+
             // Reports
             'report_gen_title' => 'Reports Generation',
             'report_export_data' => 'Export Data',
@@ -119,12 +120,12 @@ class Lang {
             'report_end_date' => 'End Date (Optional)',
             'btn_gen_pdf' => '📄 Generate PDF',
             'btn_exp_csv' => '📊 Export CSV',
-            
+
             // Settings - Tabs
             'tab_sys_config' => 'System Configuration',
             'tab_host_mgmt' => 'Host Management',
             'tab_user_mgmt' => 'User Management',
-            
+
             // Settings - Sys Config
             'sys_ping_interval' => 'Ping Interval (seconds)',
             'sys_ping_count' => 'Ping Count per Interval',
@@ -146,7 +147,7 @@ class Lang {
             'sys_audio_alerts' => 'Audio Alerts (Public Dashboard)',
             'sys_audio_normal' => 'Normal Alert Sound (Optional)',
             'sys_audio_critical' => 'Critical Alert Sound (>50% Offline) (Optional)',
-            
+
             // Settings - Host Mgmt
             'host_add_new' => 'Add New Host',
             'host_name' => 'Host Name',
@@ -163,12 +164,14 @@ class Lang {
             'btn_cancel' => 'Cancel',
             'btn_enable' => 'Enable',
             'btn_disable' => 'Disable',
-            
+            'host_disabled' => 'Disabled',
+            'host_search_placeholder' => 'Search hosts by name or IP...',
+
             // Map
             'map_view_details' => 'View Details',
             'filter_all' => 'All',
             'btn_refresh' => 'Refresh',
-            
+
             // CSV & PDF Reports
             'csv_host_name' => 'Host Name',
             'csv_ip' => 'IP',
@@ -196,13 +199,13 @@ class Lang {
             'pdf_type_stats' => 'Ping Statistics (Last 1000)',
             'pdf_any' => 'Any',
             'pdf_time' => 'Time',
-            
+
             // CSV
             'host_import_title' => 'Import/Export Hosts (CSV)',
             'host_import_format' => 'Format: IP, NAME, LATITUDE, LONGITUDE (no headers)',
             'btn_import_csv' => 'Import CSV',
             'btn_export_csv' => 'Export CSV',
-            
+
             // Settings - User Mgmt
             'user_change_password' => 'Change My Password',
             'user_current_password' => 'Current Password',
@@ -217,7 +220,7 @@ class Lang {
             'user_existing' => 'Existing Users',
             'user_role' => 'Role',
             'user_created' => 'Created At',
-            
+
             // JS alerts & confirms
             'js_confirm_clear' => 'Are you sure you want to delete ALL statistics and history? This cannot be undone!',
             'js_confirm_reset' => 'FACTORY RESET: This will delete ALL statistics, history, AND ALL HOSTS! Are you absolutely sure?',
@@ -227,7 +230,7 @@ class Lang {
             'js_next' => 'Next',
             'js_page' => 'Page',
             'js_of' => 'of',
-            
+
             // JS charting & strings
             'js_latency_ms' => 'Latency (ms)',
             'js_packet_loss' => 'Packet Loss (%)',
@@ -236,7 +239,7 @@ class Lang {
             'js_critical_offline_alert' => '🚨 MULTIPLE HOSTS OFFLINE!',
             'host_exists_ip' => 'A host with this IP already exists. We recommend editing the existing item instead.'
         ],
-        
+
         'pt' => [
             // General
             'bnet_monitor' => 'Monitor BNET',
@@ -252,7 +255,7 @@ class Lang {
             'unknown' => 'DESCONHECIDO',
             'now' => 'AGORA',
             'duration' => 'Duração',
-            
+
             // Menu
             'nav_dashboard' => 'Dashboard',
             'nav_map' => 'Mapa',
@@ -260,14 +263,14 @@ class Lang {
             'nav_reports' => 'Relatórios',
             'nav_settings' => 'Configurações',
             'nav_logout' => 'Sair',
-            
+
             // Login
             'login_welcome' => 'Bem-vindo(a) de volta',
             'login_subtitle' => 'Faça login no Monitor BNET',
             'login_username' => 'Usuário',
             'login_password' => 'Senha',
             'login_btn' => 'Entrar',
-            
+
             // Dashboard
             'dash_overview' => 'Visão Geral do Sistema',
             'sort_name' => 'Ordenar por Nome',
@@ -323,13 +326,13 @@ class Lang {
             'menu_section_version' => 'Versão da Interface',
             'menu_section_lang' => 'Idioma',
             'audio_enabled_status' => 'Áudio Ativado',
-            
+
             // Host Details & Charts
             'period_1h' => '1 Hora',
             'period_24h' => '24 Horas',
             'period_1w' => '1 Semana',
             'period_1m' => '1 Mês',
-            
+
             // History Tab
             'history_title' => 'Histórico Global de Quedas',
             'history_archived_title' => 'Quedas Arquivadas (> 30 dias)',
@@ -340,7 +343,7 @@ class Lang {
             'search_history_placeholder' => 'Buscar por nome, IP ou data...',
             'date_time_from' => 'Data e Hora (Início)',
             'date_time_to' => 'Data e Hora (Retorno)',
-            
+
             // Reports
             'report_gen_title' => 'Geração de Relatórios',
             'report_export_data' => 'Exportar Dados',
@@ -353,12 +356,12 @@ class Lang {
             'report_end_date' => 'Data de Fim (Opcional)',
             'btn_gen_pdf' => '📄 Gerar PDF',
             'btn_exp_csv' => '📊 Exportar CSV',
-            
+
             // Settings - Tabs
             'tab_sys_config' => 'Configuração do Sistema',
             'tab_host_mgmt' => 'Gerenciamento de Hosts',
             'tab_user_mgmt' => 'Gerenciamento de Usuários',
-            
+
             // Settings - Sys Config
             'sys_ping_interval' => 'Intervalo de Ping (segundos)',
             'sys_ping_count' => 'Testes de Ping por Intervalo',
@@ -380,7 +383,7 @@ class Lang {
             'sys_audio_alerts' => 'Alertas Sonoros (Dashboard Pública)',
             'sys_audio_normal' => 'Som de Alerta Normal (Opcional)',
             'sys_audio_critical' => 'Som de Alerta Crítico (>50% Offline) (Opcional)',
-            
+
             // Settings - Host Mgmt
             'host_add_new' => 'Adicionar Novo Host',
             'host_name' => 'Nome do Host',
@@ -397,12 +400,14 @@ class Lang {
             'btn_cancel' => 'Cancelar',
             'btn_enable' => 'Ativar',
             'btn_disable' => 'Desativar',
-            
+            'host_disabled' => 'Desativado',
+            'host_search_placeholder' => 'Buscar hosts por nome ou IP...',
+
             // Map
             'map_view_details' => 'Ver Detalhes',
             'filter_all' => 'Todos',
             'btn_refresh' => 'Atualizar',
-            
+
             // CSV & PDF Reports
             'csv_host_name' => 'Nome do Host',
             'csv_ip' => 'IP',
@@ -430,13 +435,13 @@ class Lang {
             'pdf_type_stats' => 'Estatísticas de Ping (Últimas 1000)',
             'pdf_any' => 'Qualquer',
             'pdf_time' => 'Hora',
-            
+
             // CSV
             'host_import_title' => 'Importar/Exportar Hosts (CSV)',
             'host_import_format' => 'Formato: IP, NOME, LATITUDE, LONGITUDE (sem cabeçalho)',
             'btn_import_csv' => 'Importar CSV',
             'btn_export_csv' => 'Exportar CSV',
-            
+
             // Settings - User Mgmt
             'user_change_password' => 'Alterar Minha Senha',
             'user_current_password' => 'Senha Atual',
@@ -451,7 +456,7 @@ class Lang {
             'user_existing' => 'Usuários Cadastrados',
             'user_role' => 'Função (Role)',
             'user_created' => 'Criado em',
-            
+
             // JS alerts & confirms
             'js_confirm_clear' => 'Tem certeza que deseja apagar TODAS as estatísticas e históricos? Isso não pode ser desfeito!',
             'js_confirm_reset' => 'RESET DE FÁBRICA: Isso apagará TODAS as estatísticas, históricos E TODOS OS HOSTS! Tem certeza absoluta?',
@@ -461,7 +466,7 @@ class Lang {
             'js_next' => 'Próx',
             'js_page' => 'Página',
             'js_of' => 'de',
-            
+
             // JS charting & strings
             'js_latency_ms' => 'Latência (ms)',
             'js_packet_loss' => 'Perda de Pacotes (%)',
@@ -472,19 +477,22 @@ class Lang {
         ]
     ];
 
-    public static function getLanguage() {
+    public static function getLanguage()
+    {
         if (isset($_COOKIE['lang']) && in_array($_COOKIE['lang'], ['en', 'pt'])) {
             return $_COOKIE['lang'];
         }
         return 'en';
     }
 
-    public static function get($key) {
+    public static function get($key)
+    {
         $lang = self::getLanguage();
         return self::$translations[$lang][$key] ?? self::$translations['en'][$key] ?? $key;
     }
-    
-    public static function getJsTranslations() {
+
+    public static function getJsTranslations()
+    {
         $lang = self::getLanguage();
         return self::$translations[$lang];
     }

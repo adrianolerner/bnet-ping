@@ -632,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let statusText = (host.status || 'unknown').toUpperCase();
         let statusColor = 'var(--text)';
         if (isInactive) {
-            statusText = 'DISABLED';
+            statusText = (window.i18n.host_disabled || 'DISABLED').toUpperCase();
             statusColor = 'var(--text-muted)';
         } else if (host.status === 'online') {
             statusColor = 'var(--success)';

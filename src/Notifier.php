@@ -1,10 +1,12 @@
 <?php
 namespace PingApp;
 
-class Notifier {
-    public static function sendRawMessage($text) {
+class Notifier
+{
+    public static function sendRawMessage($text)
+    {
         $settings = Settings::getAll();
-        
+
         if (!isset($settings['waha_enabled']) || $settings['waha_enabled'] != '1') {
             return;
         }
@@ -28,7 +30,7 @@ class Notifier {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        
+
         $headers = [
             'Accept: application/json',
             'Content-Type: application/json'
@@ -38,7 +40,7 @@ class Notifier {
         }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        
+
         $result = curl_exec($ch);
         if ($result === false) {
             error_log("WAHA Notifier Error: " . curl_error($ch));
@@ -48,15 +50,18 @@ class Notifier {
         curl_close($ch);
     }
 
-    public static function runBatchCheck() {
+    public static function runBatchCheck()
+    {
         $settings = Settings::getAll();
         if (!isset($settings['waha_enabled']) || $settings['waha_enabled'] != '1') {
             return;
         }
-        
+
         $db = Database::getConnection();
         $appUrl = rtrim($settings['app_url'] ?? 'http://localhost/ping', '/');
-        $dashboardLink = "{$appUrl}/?page=public";
+        $publicCode = trim($settings['public_access_code'] ?? '');
+        $codeParam = !empty($publicCode) ? '&code=' . urlencode($publicCode) : '';
+        $dashboardLink = "{$appUrl}/?page=public{$codeParam}";
 
         // 1. OFFLINE Check
         $stmtDown = $db->query("
@@ -74,8 +79,8 @@ class Notifier {
         if (count($downHosts) > 0) {
             if (count($downHosts) > 10) {
                 $text = "⚠️ *DIVERSOS HOSTS OFFLINE* (" . count($downHosts) . " hosts)\n\n"
-                      . "Muitos equipamentos perderam comunicação.\n\n"
-                      . "Consulte a dashboard para mais detalhes:\n{$dashboardLink}";
+                    . "Muitos equipamentos perderam comunicação.\n\n"
+                    . "Consulte a dashboard para mais detalhes:\n{$dashboardLink}";
                 $messagesToSend[] = $text;
             } elseif (count($downHosts) > 1) {
                 $text = "⚠️ *ALERTA DE INFRAESTRUTURA*\n\nOs seguintes hosts caíram:\n\n";
@@ -89,13 +94,13 @@ class Notifier {
                 $h = $downHosts[0];
                 $timeFormatted = date('d/m/Y H:i:s', strtotime($h['start_time']));
                 $text = "*ALERTA DO MONITORAMENTO*\n\n"
-                      . "Host: {$h['name']} ({$h['ip']})\n"
-                      . "Status: 🔴 OFFLINE\n"
-                      . "Data e hora da queda: {$timeFormatted}\n\n"
-                      . "Dashboard: {$dashboardLink}";
+                    . "Host: {$h['name']} ({$h['ip']})\n"
+                    . "Status: 🔴 OFFLINE\n"
+                    . "Data e hora da queda: {$timeFormatted}\n\n"
+                    . "Dashboard: {$dashboardLink}";
                 $messagesToSend[] = $text;
             }
-            
+
             $ids = array_column($downHosts, 'id');
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             $stmtUpdateDown = $db->prepare("UPDATE host_downtimes SET notified_down = 1 WHERE id IN ($placeholders)");
@@ -116,8 +121,8 @@ class Notifier {
         if (count($upHosts) > 0) {
             if (count($upHosts) > 10) {
                 $text = "✅ *DIVERSOS HOSTS ONLINE* (" . count($upHosts) . " hosts)\n\n"
-                      . "Vários equipamentos que estavam offline restabeleceram a comunicação.\n\n"
-                      . "Consulte a dashboard para mais detalhes:\n{$dashboardLink}";
+                    . "Vários equipamentos que estavam offline restabeleceram a comunicação.\n\n"
+                    . "Consulte a dashboard para mais detalhes:\n{$dashboardLink}";
                 $messagesToSend[] = $text;
             } elseif (count($upHosts) > 1) {
                 $text = "✅ *ALERTA DE INFRAESTRUTURA*\n\nOs seguintes hosts restabeleceram a comunicação:\n\n";
@@ -134,13 +139,13 @@ class Notifier {
                 $durationStr = $hours > 0 ? "{$hours}h {$minutes}m" : "{$minutes} minutos";
 
                 $text = "*ALERTA DO MONITORAMENTO*\n\n"
-                      . "Host: {$h['name']} ({$h['ip']})\n"
-                      . "Status: 🟢 ONLINE\n"
-                      . "Tempo Fora: {$durationStr}\n\n"
-                      . "Dashboard: {$dashboardLink}";
+                    . "Host: {$h['name']} ({$h['ip']})\n"
+                    . "Status: 🟢 ONLINE\n"
+                    . "Tempo Fora: {$durationStr}\n\n"
+                    . "Dashboard: {$dashboardLink}";
                 $messagesToSend[] = $text;
             }
-            
+
             $ids = array_column($upHosts, 'id');
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             $stmtUpdateUp = $db->prepare("UPDATE host_downtimes SET notified_up = 1 WHERE id IN ($placeholders)");

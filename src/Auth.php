@@ -101,6 +101,58 @@ class Auth {
         return isset($_SESSION['user_id']);
     }
 
+    public static function isPublicAccessAuthorized() {
+        $expected = Settings::get('public_access_code', '');
+        if (empty($expected)) {
+            return true;
+        }
+
+        // Se houver sessão ativa do usuário logado (ex: admin), libera acesso
+        $sessName = session_name();
+        if ((isset($_COOKIE[$sessName]) || session_status() === PHP_SESSION_ACTIVE) && self::isLoggedIn()) {
+            return true;
+        }
+
+        // Verifica cookie de acesso público
+        if (isset($_COOKIE['public_access_code']) && is_string($_COOKIE['public_access_code'])) {
+            if (hash_equals($expected, $_COOKIE['public_access_code'])) {
+                return true;
+            }
+        }
+
+        // Verifica parâmetro de URL (magic link de notificações WAHA)
+        $codeParam = $_GET['code'] ?? $_GET['access_code'] ?? null;
+        if (!empty($codeParam) && is_string($codeParam)) {
+            if (hash_equals($expected, $codeParam)) {
+                if (!headers_sent()) {
+                    $isHttps = self::isHttps();
+                    if (PHP_VERSION_ID >= 70300) {
+                        setcookie('public_access_code', $expected, [
+                            'expires' => time() + (30 * 24 * 60 * 60),
+                            'path' => '/',
+                            'secure' => $isHttps,
+                            'httponly' => true,
+                            'samesite' => 'Lax'
+                        ]);
+                    } else {
+                        setcookie('public_access_code', $expected, time() + (30 * 24 * 60 * 60), '/; SameSite=Lax' . ($isHttps ? '; Secure' : '') . '; HttpOnly');
+                    }
+                }
+                return true;
+            }
+        }
+
+        // Verifica cabeçalho X-Public-Access-Code enviado pelo frontend
+        $headerCode = $_SERVER['HTTP_X_PUBLIC_ACCESS_CODE'] ?? null;
+        if (!empty($headerCode) && is_string($headerCode)) {
+            if (hash_equals($expected, $headerCode)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function isAdmin() {
         self::startSession();
         return isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';

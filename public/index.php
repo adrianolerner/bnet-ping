@@ -3,7 +3,7 @@
  * INSTRUÇÃO: Sempre atualize a constante APP_VERSION (versões e subversões) 
  * sempre que realizar alterações futuras no código do sistema!
  */
-define('APP_VERSION', '0.14.3');
+define('APP_VERSION', '0.15.0');
 
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/Auth.php';
@@ -35,6 +35,7 @@ $allowedPages = [
     'export_hosts_csv',
     'export_pdf',
     'set_lang',
+    'api/verify-public-code',
     'api/hosts-public',
     'api/analytics-public',
     'api/map-config',
@@ -82,10 +83,10 @@ if ($page === 'sitemap.xml' || strpos($_SERVER['REQUEST_URI'] ?? '', 'sitemap.xm
 }
 
 // Apenas inicia sessão PHP para rotas administrativas/autenticadas.
-// Rotas públicas (public, api/hosts-public, api/analytics-public) NUNCA iniciam sessão,
+// Rotas públicas (public, api/hosts-public, api/analytics-public, api/verify-public-code) NUNCA iniciam sessão,
 // eliminando completamente qualquer bloqueio de arquivo de sessão (flock) e permitindo
 // paralelismo instantâneo entre abas, requisições paralelas e recarregamentos (F5)
-$isPublicRoute = ($page === 'public' || $page === 'api/hosts-public' || $page === 'api/analytics-public');
+$isPublicRoute = ($page === 'public' || $page === 'api/hosts-public' || $page === 'api/analytics-public' || $page === 'api/verify-public-code');
 
 if (!$isPublicRoute) {
     Auth::startSession();
@@ -523,8 +524,41 @@ if ($page === 'export_pdf') {
 
 if (strpos($page, 'api/') === 0) {
     header('Content-Type: application/json');
+
+    if ($page === 'api/verify-public-code') {
+        session_write_close();
+        $code = $_POST['code'] ?? $_GET['code'] ?? '';
+        $expected = Settings::get('public_access_code', '');
+        if (empty($expected) || (is_string($code) && hash_equals($expected, $code))) {
+            $isHttps = Auth::isHttps();
+            if (!empty($expected)) {
+                if (PHP_VERSION_ID >= 70300) {
+                    setcookie('public_access_code', $expected, [
+                        'expires' => time() + (30 * 24 * 60 * 60),
+                        'path' => '/',
+                        'secure' => $isHttps,
+                        'httponly' => true,
+                        'samesite' => 'Lax'
+                    ]);
+                } else {
+                    setcookie('public_access_code', $expected, time() + (30 * 24 * 60 * 60), '/; SameSite=Lax' . ($isHttps ? '; Secure' : '') . '; HttpOnly');
+                }
+            }
+            echo json_encode(['success' => true]);
+        } else {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Invalid code']);
+        }
+        exit;
+    }
+
     if ($page === 'api/hosts-public') {
         session_write_close();
+        if (!Auth::isPublicAccessAuthorized()) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            exit;
+        }
         $hosts = Host::getAll();
         // Remove IP for public dashboard
         foreach ($hosts as &$h) {
@@ -536,6 +570,11 @@ if (strpos($page, 'api/') === 0) {
 
     if ($page === 'api/analytics-public') {
         session_write_close();
+        if (!Auth::isPublicAccessAuthorized()) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            exit;
+        }
         echo json_encode(PingData::getAnalyticsData());
         exit;
     }
@@ -646,6 +685,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                 'waha_chat_id' => $_POST['waha_chat_id'],
                 'waha_session' => $_POST['waha_session'],
                 'app_url' => $_POST['app_url'] ?? '',
+                'public_access_code' => trim($_POST['public_access_code'] ?? ''),
             ];
 
             $audioDir = __DIR__ . '/audio/';
@@ -1154,6 +1194,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                 </div>
             </div>
 
+            <!-- PUBLIC ACCESS CODE MODAL -->
+            <div id="publicAccessModal"
+                class="version-modal-overlay <?= (!empty(\PingApp\Settings::get('public_access_code', '')) && !\PingApp\Auth::isPublicAccessAuthorized()) ? 'show' : '' ?>"
+                style="z-index: 13000;">
+                <div class="version-modal-card" style="max-width: 400px; text-align: center;">
+                    <div style="font-size: 2.8rem; margin-bottom: 0.8rem; line-height: 1;">🔐</div>
+                    <h2 class="version-modal-title" style="margin-bottom: 0.5rem; font-size: 1.35rem;">
+                        <?= Lang::get('public_access_title') ?></h2>
+                    <p class="version-modal-subtitle"
+                        style="margin-bottom: 1.25rem; font-size: 0.88rem; color: #94a3b8; line-height: 1.4;">
+                        <?= Lang::get('public_access_desc') ?></p>
+
+                    <form id="publicAccessForm" onsubmit="return false;"
+                        style="display: flex; flex-direction: column; gap: 0.9rem;">
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="publicAccessCodeInput" class="form-control"
+                                placeholder="<?= Lang::get('public_access_placeholder') ?>" autocomplete="current-password"
+                                style="width: 100%; padding: 0.75rem 2.5rem 0.75rem 0.9rem; font-size: 1.05rem; letter-spacing: 2px; text-align: center; border-radius: 8px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); color: #fff;">
+                            <button type="button" id="togglePublicCodeBtn"
+                                style="position: absolute; right: 12px; background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 1.1rem;">👁️</button>
+                        </div>
+                        <div id="publicAccessError"
+                            style="display: none; color: #f87171; font-size: 0.85rem; font-weight: 500;">
+                            <?= Lang::get('public_access_invalid') ?>
+                        </div>
+                        <button type="submit" id="btnSubmitPublicCode" class="btn btn-primary"
+                            style="padding: 0.75rem 1rem; font-size: 0.95rem; font-weight: 600; border-radius: 8px; width: 100%;">
+                            <?= Lang::get('public_access_submit') ?>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             <!-- TAB 1: DASHBOARD VIEW -->
             <div id="publicDashboardView" style="display: block; flex: 1; min-height: 0; overflow: hidden; height: 100%;">
                 <div class="public-grid" id="publicGrid"
@@ -1286,6 +1359,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                 </div>
             </div>
 
+            <script>
+                window.publicAccessRequired = <?= !empty(\PingApp\Settings::get('public_access_code', '')) ? 'true' : 'false' ?>;
+            </script>
             <script src="js/public.js?v=<?= APP_VERSION ?>"></script>
         <?php elseif ($page === 'map'): ?>
             <div class="dashboard-header">
@@ -1657,6 +1733,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                                 <input type="text" name="app_url"
                                     value="<?= htmlspecialchars($settings['app_url'] ?? 'http://localhost/ping') ?>"
                                     placeholder="http://your-domain.com/ping">
+                            </div>
+
+                            <div class="form-group">
+                                <label><?= Lang::get('sys_public_access_code') ?></label>
+                                <div style="position: relative; display: flex; align-items: center;">
+                                    <input type="password" name="public_access_code" id="public_access_code_input"
+                                        value="<?= htmlspecialchars($settings['public_access_code'] ?? '') ?>"
+                                        placeholder="Ex: 123456" style="width: 100%; padding-right: 40px;">
+                                    <button type="button" onclick="togglePassword('public_access_code_input')"
+                                        style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text);">👁️</button>
+                                </div>
+                                <small
+                                    style="display:block; margin-top:0.4rem; color: var(--text-muted, #94a3b8); line-height: 1.4;">
+                                    <?= Lang::get('sys_public_access_code_help') ?>
+                                </small>
                             </div>
 
                             <button type="submit" class="btn btn-primary"><?= Lang::get('btn_save_config') ?></button>

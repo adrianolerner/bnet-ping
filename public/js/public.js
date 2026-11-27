@@ -22,6 +22,123 @@ document.addEventListener('DOMContentLoaded', () => {
     const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
     const closeMobileMenuBtn = document.getElementById('closeMobileMenuBtn');
 
+    // Public Access Modal Elements
+    const publicAccessModal = document.getElementById('publicAccessModal');
+    const publicAccessForm = document.getElementById('publicAccessForm');
+    const publicAccessCodeInput = document.getElementById('publicAccessCodeInput');
+    const togglePublicCodeBtn = document.getElementById('togglePublicCodeBtn');
+    const publicAccessError = document.getElementById('publicAccessError');
+    const btnSubmitPublicCode = document.getElementById('btnSubmitPublicCode');
+
+    // Parse URL for Magic Link access code (from WAHA notifications)
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeFromUrl = urlParams.get('code') || urlParams.get('access_code');
+    if (codeFromUrl) {
+        localStorage.setItem('public_access_code', codeFromUrl);
+        urlParams.delete('code');
+        urlParams.delete('access_code');
+        const newQuery = urlParams.toString();
+        const newUrl = window.location.pathname + (newQuery ? '?' + newQuery : '') + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+        if (publicAccessModal) {
+            publicAccessModal.classList.remove('show');
+        }
+    }
+
+    function getPublicAccessCode() {
+        return localStorage.getItem('public_access_code') || '';
+    }
+
+    function showAccessCodeModal() {
+        if (publicAccessModal) {
+            publicAccessModal.classList.add('show');
+            if (publicAccessCodeInput) {
+                setTimeout(() => publicAccessCodeInput.focus(), 100);
+            }
+        }
+        if (versionSelectModal) {
+            versionSelectModal.classList.remove('show');
+        }
+    }
+
+    function hideAccessCodeModal() {
+        if (publicAccessModal) {
+            publicAccessModal.classList.remove('show');
+        }
+    }
+
+    if (togglePublicCodeBtn && publicAccessCodeInput) {
+        togglePublicCodeBtn.addEventListener('click', () => {
+            publicAccessCodeInput.type = publicAccessCodeInput.type === 'password' ? 'text' : 'password';
+        });
+    }
+
+    async function submitAccessCode() {
+        if (!publicAccessCodeInput) return;
+        const code = publicAccessCodeInput.value.trim();
+        if (!code) return;
+
+        if (btnSubmitPublicCode) {
+            btnSubmitPublicCode.disabled = true;
+            btnSubmitPublicCode.style.opacity = '0.7';
+        }
+        if (publicAccessError) {
+            publicAccessError.style.display = 'none';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('code', code);
+            const res = await fetch('?page=api/verify-public-code', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+                localStorage.setItem('public_access_code', code);
+                hideAccessCodeModal();
+                if (!localStorage.getItem('public_view_mode') && versionSelectModal) {
+                    versionSelectModal.classList.add('show');
+                }
+                fetchHosts();
+                if (typeof activeTab !== 'undefined' && activeTab === 'analytics') {
+                    fetchAnalytics();
+                }
+            } else {
+                if (publicAccessError) {
+                    publicAccessError.style.display = 'block';
+                }
+                if (publicAccessCodeInput) {
+                    publicAccessCodeInput.select();
+                }
+            }
+        } catch (err) {
+            console.error('Error verifying code:', err);
+            if (publicAccessError) {
+                publicAccessError.style.display = 'block';
+            }
+        } finally {
+            if (btnSubmitPublicCode) {
+                btnSubmitPublicCode.disabled = false;
+                btnSubmitPublicCode.style.opacity = '1';
+            }
+        }
+    }
+
+    if (publicAccessForm) {
+        publicAccessForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            submitAccessCode();
+        });
+    }
+    if (btnSubmitPublicCode) {
+        btnSubmitPublicCode.addEventListener('click', (e) => {
+            e.preventDefault();
+            submitAccessCode();
+        });
+    }
+
     let hostsData = [];
     let audioEnabled = localStorage.getItem('audioEnabled') === 'true';
     let tvModeEnabled = localStorage.getItem('tvModeEnabled') === 'true' || localStorage.getItem('tvModeEnabled') === null; // Default true
@@ -67,9 +184,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedViewMode === 'mobile' || savedViewMode === 'desktop') {
         applyViewMode(savedViewMode, false);
     } else if (versionSelectModal) {
-        setTimeout(() => {
-            versionSelectModal.classList.add('show');
-        }, 50);
+        const isAccessModalShown = publicAccessModal && publicAccessModal.classList.contains('show');
+        if (!isAccessModalShown) {
+            setTimeout(() => {
+                versionSelectModal.classList.add('show');
+            }, 50);
+        }
     }
 
     if (btnChooseMobile) {
@@ -247,7 +367,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isFetchingHosts) return;
         isFetchingHosts = true;
         try {
-            const res = await fetch('?page=api/hosts-public');
+            const headers = {};
+            const code = getPublicAccessCode();
+            if (code) {
+                headers['X-Public-Access-Code'] = code;
+            }
+            const res = await fetch('?page=api/hosts-public', { headers });
+            if (res.status === 401) {
+                showAccessCodeModal();
+                return;
+            }
             if (!res.ok) throw new Error('HTTP ' + res.status);
             hostsData = await res.json();
 
@@ -685,7 +814,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isFetchingAnalytics) return;
         isFetchingAnalytics = true;
         try {
-            const res = await fetch('?page=api/analytics-public');
+            const headers = {};
+            const code = getPublicAccessCode();
+            if (code) {
+                headers['X-Public-Access-Code'] = code;
+            }
+            const res = await fetch('?page=api/analytics-public', { headers });
+            if (res.status === 401) {
+                showAccessCodeModal();
+                return;
+            }
             if (!res.ok) throw new Error('HTTP ' + res.status);
             analyticsData = await res.json();
             renderAnalytics(analyticsData);

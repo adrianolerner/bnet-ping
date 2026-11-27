@@ -37,16 +37,35 @@ class Auth {
         // Content-Security-Policy (CSP)
         // Permite os recursos legítimos da aplicação (CDNs Chart.js, Turnstile, Leaflet, Google Fonts, OpenStreetMap/Carto)
         $csp = "default-src 'self'; " .
-               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com https://unpkg.com; " .
+               "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://challenges.cloudflare.com https://unpkg.com; " .
                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; " .
                "font-src 'self' https://fonts.gstatic.com data:; " .
-               "img-src 'self' data: https: blob:; " .
-               "connect-src 'self' https:; " .
+               "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://*.openstreetmap.org; " .
+               "connect-src 'self' https://challenges.cloudflare.com https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://*.openstreetmap.org; " .
                "frame-src 'self' https://challenges.cloudflare.com; " .
                "media-src 'self' blob: data:; " .
                "object-src 'none'; " .
-               "base-uri 'self';";
+               "base-uri 'self'; " .
+               "form-action 'self'; " .
+               "frame-ancestors 'self'; " .
+               "upgrade-insecure-requests;";
         header("Content-Security-Policy: {$csp}");
+    }
+
+    public static function generateCsrfToken() {
+        self::startSession();
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    public static function verifyCsrfToken($token) {
+        self::startSession();
+        if (empty($_SESSION['csrf_token']) || empty($token) || !is_string($token)) {
+            return false;
+        }
+        return hash_equals($_SESSION['csrf_token'], $token);
     }
 
     public static function startSession() {
@@ -116,8 +135,10 @@ class Auth {
 
         if ($user && password_verify($password, $user['password'])) {
             self::startSession();
+            session_regenerate_id(true);
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_role'] = $user['role'] ?? 'user';
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             self::clearFailedAttempts($ip);
             return ['success' => true];
         }

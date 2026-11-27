@@ -13,9 +13,16 @@ Options -Indexes
 
 # Headers de segurança HTTP
 <IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
     Header always set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
     Header always set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
     Header unset X-Powered-By
+    Header always unset X-Powered-By
 </IfModule>

@@ -3,7 +3,7 @@
  * INSTRUÇÃO: Sempre atualize a constante APP_VERSION (versões e subversões) 
  * sempre que realizar alterações futuras no código do sistema!
  */
-define('APP_VERSION', '0.14.2');
+define('APP_VERSION', '0.14.3');
 
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/Auth.php';
@@ -21,15 +21,62 @@ use PingApp\Lang;
 // Aplica cabeçalhos de segurança em todas as respostas (CSP, HSTS, X-Content-Type-Options, etc.)
 Auth::applySecurityHeaders();
 
-$page = $_GET['page'] ?? 'dashboard';
+$allowedPages = [
+    'dashboard',
+    'public',
+    'login',
+    'logout',
+    'map',
+    'host',
+    'reports',
+    'settings',
+    'history',
+    'export_csv',
+    'export_hosts_csv',
+    'export_pdf',
+    'set_lang',
+    'api/hosts-public',
+    'api/analytics-public',
+    'api/map-config',
+    'api/hosts',
+    'api/metrics',
+    'api/history',
+    'api/history-archived',
+    '.well-known/security.txt',
+    'security.txt',
+    'robots.txt',
+    'sitemap.xml'
+];
+$rawPage = $_GET['page'] ?? 'dashboard';
+$page = in_array($rawPage, $allowedPages, true) ? $rawPage : 'dashboard';
 
-// Endpoint RFC 9116 security.txt
+// Endpoint RFC 9116 security.txt e arquivos utilitários
 if ($page === '.well-known/security.txt' || $page === 'security.txt' || strpos($_SERVER['REQUEST_URI'] ?? '', 'security.txt') !== false) {
     header('Content-Type: text/plain; charset=utf-8');
     if (file_exists(__DIR__ . '/.well-known/security.txt')) {
         readfile(__DIR__ . '/.well-known/security.txt');
     } elseif (file_exists(__DIR__ . '/../.well-known/security.txt')) {
         readfile(__DIR__ . '/../.well-known/security.txt');
+    }
+    exit;
+}
+
+if ($page === 'robots.txt' || strpos($_SERVER['REQUEST_URI'] ?? '', 'robots.txt') !== false) {
+    header('Content-Type: text/plain; charset=utf-8');
+    if (file_exists(__DIR__ . '/robots.txt')) {
+        readfile(__DIR__ . '/robots.txt');
+    } elseif (file_exists(__DIR__ . '/../robots.txt')) {
+        readfile(__DIR__ . '/../robots.txt');
+    }
+    exit;
+}
+
+if ($page === 'sitemap.xml' || strpos($_SERVER['REQUEST_URI'] ?? '', 'sitemap.xml') !== false) {
+    header('Content-Type: application/xml; charset=utf-8');
+    if (file_exists(__DIR__ . '/sitemap.xml')) {
+        readfile(__DIR__ . '/sitemap.xml');
+    } elseif (file_exists(__DIR__ . '/../sitemap.xml')) {
+        readfile(__DIR__ . '/../sitemap.xml');
     }
     exit;
 }
@@ -345,7 +392,9 @@ if ($page === 'export_pdf') {
                 }
             }
         </style>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+            integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC"
+            crossorigin="anonymous"></script>
     </head>
 
     <body>
@@ -515,27 +564,32 @@ if (strpos($page, 'api/') === 0) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'login') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-    $token = $_POST['cf-turnstile-response'] ?? null;
-
-    $result = Auth::login($username, $password, $token);
-    if ($result['success']) {
-        $redirect = $_SESSION['redirect_to'] ?? '?page=dashboard';
-        unset($_SESSION['redirect_to']);
-
-        if (strpos($redirect, '/') === 0) {
-            $settings = \PingApp\Settings::getAll();
-            if (!empty($settings['app_url'])) {
-                $appUrl = rtrim($settings['app_url'], '/');
-                $redirect = $appUrl . $redirect;
-            }
-        }
-
-        header("Location: " . $redirect);
-        exit;
+    $csrfToken = $_POST['csrf_token'] ?? '';
+    if (!Auth::verifyCsrfToken($csrfToken)) {
+        $loginError = 'Invalid security token (CSRF). Please reload the page.';
     } else {
-        $loginError = $result['error'];
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
+        $token = $_POST['cf-turnstile-response'] ?? null;
+
+        $result = Auth::login($username, $password, $token);
+        if ($result['success']) {
+            $redirect = $_SESSION['redirect_to'] ?? '?page=dashboard';
+            unset($_SESSION['redirect_to']);
+
+            if (strpos($redirect, '/') === 0) {
+                $settings = \PingApp\Settings::getAll();
+                if (!empty($settings['app_url'])) {
+                    $appUrl = rtrim($settings['app_url'], '/');
+                    $redirect = $appUrl . $redirect;
+                }
+            }
+
+            header("Location: " . $redirect);
+            exit;
+        } else {
+            $loginError = $result['error'];
+        }
     }
 }
 
@@ -552,6 +606,12 @@ if ($page !== 'login' && $page !== 'public') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
+    $csrfToken = $_POST['csrf_token'] ?? '';
+    if (!Auth::verifyCsrfToken($csrfToken)) {
+        $_SESSION['settings_error'] = 'Invalid security token (CSRF). Please try again.';
+        header("Location: ?page=settings");
+        exit;
+    }
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add_host') {
             $ip = $_POST['ip'];
@@ -782,7 +842,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
     <link rel="stylesheet" href="css/style.css?v=<?= APP_VERSION ?>">
     <link rel="stylesheet" href="css/analytics.css?v=<?= APP_VERSION ?>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+        integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC"
+        crossorigin="anonymous"></script>
     <?php
     $settings = Settings::getAll();
     if ($page === 'login' && isset($settings['turnstile_enabled']) && $settings['turnstile_enabled'] == '1') {
@@ -843,6 +905,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                         <div class="alert alert-error"><?= htmlspecialchars($loginError) ?></div>
                     <?php endif; ?>
                     <form method="POST" action="?page=login">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                         <div class="form-group">
                             <label><?= Lang::get('login_username') ?></label>
                             <input type="text" name="username" required>
@@ -1248,11 +1311,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
             </div>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
                 integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"
+                integrity="sha384-lPzjPsFQL6te2x+VxmV6q1DpRxpRk0tmnl2cpwAO5y04ESyc752tnEWPKDfl1olr"
+                crossorigin="anonymous" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css"
+                integrity="sha384-5kMSQJ6S4Qj5i09mtMNrWpSi8iXw230pKU76xTmrpezGnNJQzj0NzXjQLLg+jE7k"
+                crossorigin="anonymous" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
                 integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-            <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+            <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"
+                integrity="sha384-RLIyj5q1b5XJTn0tqUhucRZe40nFTocRP91R/NkRJHwAe4XxnTV77FXy/vGLiec2"
+                crossorigin="anonymous"></script>
             <div id="map"
                 style="width: 100%; height: calc(90vh - 150px); border-radius: 8px; border: 1px solid var(--border); z-index: 1;">
             </div>
@@ -1471,6 +1540,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                     <div class="settings-card">
                         <h3><?= Lang::get('tab_sys_config') ?></h3>
                         <form method="POST" action="?page=settings" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                             <input type="hidden" name="action" value="update_settings">
                             <div class="form-group">
                                 <label><?= Lang::get('sys_ping_interval') ?></label>
@@ -1606,12 +1676,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
                             <form method="POST" action="?page=settings"
                                 onsubmit="return confirm(window.i18n.js_confirm_clear);">
+                                <input type="hidden" name="csrf_token"
+                                    value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                                 <input type="hidden" name="action" value="clear_stats">
                                 <button type="submit" class="btn btn-warning"
                                     style="background-color: #f59e0b; color: white;"><?= Lang::get('btn_clear_stats') ?></button>
                             </form>
                             <form method="POST" action="?page=settings"
                                 onsubmit="return confirm(window.i18n.js_confirm_reset);">
+                                <input type="hidden" name="csrf_token"
+                                    value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                                 <input type="hidden" name="action" value="factory_reset">
                                 <button type="submit" class="btn btn-danger"><?= Lang::get('btn_factory_reset') ?></button>
                             </form>
@@ -1625,6 +1699,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                 <div class="settings-card">
                     <h3><?= Lang::get('tab_host_mgmt') ?></h3>
                     <form method="POST" action="?page=settings" class="add-host-form">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                         <input type="hidden" name="action" value="add_host">
                         <div class="input-group">
                             <input type="text" name="name" placeholder="<?= Lang::get('host_name') ?>" required>
@@ -1653,6 +1728,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                                 <div class="host-edit-form" id="host_edit_<?= $h['id'] ?>"
                                     style="display:none; flex:1; margin-right:1rem;">
                                     <form method="POST" action="?page=settings" style="display:flex; gap:0.5rem; width:100%;">
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                                         <input type="hidden" name="action" value="edit_host">
                                         <input type="hidden" name="id" value="<?= $h['id'] ?>">
                                         <input type="text" name="name" value="<?= htmlspecialchars($h['name']) ?>" required
@@ -1674,6 +1751,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                                     <button type="button" class="btn btn-primary btn-sm"
                                         onclick="toggleEdit(<?= $h['id'] ?>)"><?= Lang::get('btn_edit') ?></button>
                                     <form method="POST" action="?page=settings">
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                                         <input type="hidden" name="action" value="toggle_active_host">
                                         <input type="hidden" name="id" value="<?= $h['id'] ?>">
                                         <input type="hidden" name="active"
@@ -1685,6 +1764,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                                     </form>
                                     <form method="POST" action="?page=settings"
                                         onsubmit="return confirm(window.i18n.js_confirm_delete_host)">
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                                         <input type="hidden" name="action" value="delete_host">
                                         <input type="hidden" name="id" value="<?= $h['id'] ?>">
                                         <button type="submit"
@@ -1734,6 +1815,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                     <p class="text-muted mb-3"><?= Lang::get('host_import_format') ?></p>
                     <div style="display: flex; flex-direction: column; gap: 1rem;">
                         <form method="POST" action="?page=settings" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token"
+                                value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                             <input type="hidden" name="action" value="import_csv">
                             <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                 <input type="file" name="csv_file" accept=".csv" required class="file-input"
@@ -1757,6 +1840,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
 
                     <h4 style="margin-top:0;"><?= Lang::get('user_change_password') ?></h4>
                     <form method="POST" action="?page=settings">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                         <input type="hidden" name="action" value="change_password">
                         <div class="form-group">
                             <input type="password" name="current_password"
@@ -1774,6 +1858,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                         <div class="divider"></div>
                         <h4><?= Lang::get('user_add_new') ?></h4>
                         <form method="POST" action="?page=settings">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                             <input type="hidden" name="action" value="add_user">
                             <div class="input-group">
                                 <input type="text" name="new_username" placeholder="<?= Lang::get('user_username') ?>" required>
@@ -1796,6 +1881,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'settings') {
                                     <?php if ($u['id'] !== $_SESSION['user_id']): ?>
                                         <form method="POST" action="?page=settings"
                                             onsubmit="return confirm(window.i18n.js_confirm_delete_user)">
+                                            <input type="hidden" name="csrf_token"
+                                                value="<?= htmlspecialchars(Auth::generateCsrfToken()) ?>">
                                             <input type="hidden" name="action" value="delete_user">
                                             <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
                                             <button type="submit" class="btn btn-danger btn-sm"><?= Lang::get('btn_delete') ?></button>

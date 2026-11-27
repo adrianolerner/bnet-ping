@@ -2,8 +2,77 @@
 namespace PingApp;
 
 class Auth {
+    public static function isHttps() {
+        return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on');
+    }
+
+    public static function applySecurityHeaders() {
+        if (headers_sent()) {
+            return;
+        }
+
+        // Remove cabeçalho que revela a tecnologia/versão do PHP
+        header_remove('X-Powered-By');
+
+        // Previne MIME type sniffing
+        header('X-Content-Type-Options: nosniff');
+
+        // Proteção contra Clickjacking
+        header('X-Frame-Options: SAMEORIGIN');
+
+        // Política de Referrer segura (evita vazamento de URL completa externamente)
+        header('Referrer-Policy: strict-origin-when-cross-origin');
+
+        // Restringe acesso a recursos de hardware/sensores não utilizados
+        header('Permissions-Policy: camera=(), microphone=(), geolocation=(self)');
+
+        // HSTS (HTTP Strict Transport Security) caso HTTPS esteja em uso
+        if (self::isHttps()) {
+            header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+        }
+
+        // Content-Security-Policy (CSP)
+        // Permite os recursos legítimos da aplicação (CDNs Chart.js, Turnstile, Leaflet, Google Fonts, OpenStreetMap/Carto)
+        $csp = "default-src 'self'; " .
+               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com https://unpkg.com; " .
+               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; " .
+               "font-src 'self' https://fonts.gstatic.com data:; " .
+               "img-src 'self' data: https: blob:; " .
+               "connect-src 'self' https:; " .
+               "frame-src 'self' https://challenges.cloudflare.com; " .
+               "media-src 'self' blob: data:; " .
+               "object-src 'none'; " .
+               "base-uri 'self';";
+        header("Content-Security-Policy: {$csp}");
+    }
+
     public static function startSession() {
         if (session_status() === PHP_SESSION_NONE) {
+            $isHttps = self::isHttps();
+
+            ini_set('session.cookie_httponly', '1');
+            if ($isHttps) {
+                ini_set('session.cookie_secure', '1');
+            }
+            ini_set('session.cookie_samesite', 'Lax');
+            ini_set('session.use_strict_mode', '1');
+
+            if (PHP_VERSION_ID >= 70300) {
+                session_set_cookie_params([
+                    'lifetime' => 0,
+                    'path' => '/',
+                    'domain' => '',
+                    'secure' => $isHttps,
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]);
+            } else {
+                session_set_cookie_params(0, '/; samesite=Lax', '', $isHttps, true);
+            }
+
             session_start();
         }
     }

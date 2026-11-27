@@ -3,7 +3,7 @@
  * INSTRUÇÃO: Sempre atualize a constante APP_VERSION (versões e subversões) 
  * sempre que realizar alterações futuras no código do sistema!
  */
-define('APP_VERSION', '0.14.1');
+define('APP_VERSION', '0.14.2');
 
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/Auth.php';
@@ -18,7 +18,21 @@ use PingApp\Host;
 use PingApp\PingData;
 use PingApp\Lang;
 
+// Aplica cabeçalhos de segurança em todas as respostas (CSP, HSTS, X-Content-Type-Options, etc.)
+Auth::applySecurityHeaders();
+
 $page = $_GET['page'] ?? 'dashboard';
+
+// Endpoint RFC 9116 security.txt
+if ($page === '.well-known/security.txt' || $page === 'security.txt' || strpos($_SERVER['REQUEST_URI'] ?? '', 'security.txt') !== false) {
+    header('Content-Type: text/plain; charset=utf-8');
+    if (file_exists(__DIR__ . '/.well-known/security.txt')) {
+        readfile(__DIR__ . '/.well-known/security.txt');
+    } elseif (file_exists(__DIR__ . '/../.well-known/security.txt')) {
+        readfile(__DIR__ . '/../.well-known/security.txt');
+    }
+    exit;
+}
 
 // Apenas inicia sessão PHP para rotas administrativas/autenticadas.
 // Rotas públicas (public, api/hosts-public, api/analytics-public) NUNCA iniciam sessão,
@@ -33,7 +47,18 @@ if (!$isPublicRoute) {
 if ($page === 'set_lang') {
     $lang = $_GET['lang'] ?? 'en';
     if (in_array($lang, ['en', 'pt'])) {
-        setcookie('lang', $lang, time() + (10 * 365 * 24 * 60 * 60), '/'); // 10 years
+        $isHttps = Auth::isHttps();
+        if (PHP_VERSION_ID >= 70300) {
+            setcookie('lang', $lang, [
+                'expires' => time() + (10 * 365 * 24 * 60 * 60),
+                'path' => '/',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
+        } else {
+            setcookie('lang', $lang, time() + (10 * 365 * 24 * 60 * 60), '/; SameSite=Lax' . ($isHttps ? '; Secure' : '') . '; HttpOnly');
+        }
     }
     header("Location: " . ($_SERVER['HTTP_REFERER'] ?? '?page=dashboard'));
     exit;

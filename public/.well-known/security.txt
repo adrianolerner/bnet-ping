@@ -1,0 +1,5 @@
+Contact: mailto:suporte@castro.pr.gov.br
+Preferred-Languages: pt, en
+Canonical: https://status.castro.pr.gov.br/.well-known/security.txt
+Policy: https://status.castro.pr.gov.br/
+Expires: 2027-12-31T23:59:59.000Z
